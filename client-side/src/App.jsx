@@ -5,7 +5,7 @@ import Sidebar from './Sidebar'
 import ChatArea from './chatarea'
 
 // ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://zento-384q.onrender.com";
+const API_URL = "https://linksy-tn3q.onrender.com";
 
 function App() {
   const [show, setshow] = useState(false)
