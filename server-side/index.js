@@ -29,7 +29,24 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const app = express()
 const _dirname = path.resolve();
 
-app.use(cors())
+const allowedOrigins = [
+    'https://linksy-tn3q.onrender.com',
+    'https://zento-384q.onrender.com',
+    'http://localhost:3001'
+];
+
+app.use(cors({
+    origin: function(origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ limit: '10mb', extended: true }))
 
