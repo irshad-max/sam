@@ -78,11 +78,11 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-        
+
         const imageUrl = `/uploads/${req.file.filename}`;
-        res.json({ 
+        res.json({
             success: true,
-            imageUrl: imageUrl 
+            imageUrl: imageUrl
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -90,12 +90,10 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 });
 
 // ========== EMAIL CONFIGURATION (Using env variables) ==========
+const EMAIL_PASS = process.env.EMAIL_PASS;   // no fallback
 const transporter = nodemailer.createTransport({
     service: "gmail",
-    auth: {
-        user: EMAIL_USER,    // ✅ Using env variable
-        pass: EMAIL_PASS,    // ✅ Using env variable
-    },
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
 });
 
 const otpStore = new Map();
@@ -136,7 +134,7 @@ async function sendOTPEmail(email, otp, name) {
 // ========== REGISTER API ==========
 app.post("/register", async (req, res) => {
     const { name, email, password, profileImage } = req.body;
-    
+
     if (!name || !email || !password) {
         return res.status(400).json({ error: "All fields are required" });
     }
@@ -146,10 +144,10 @@ app.post("/register", async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ error: "Email already registered" });
         }
-        
+
         const otp = generateOTP();
         const otpExpiry = Date.now() + 10 * 60 * 1000;
-        
+
         otpStore.set(email, {
             otp,
             expiry: otpExpiry,
@@ -160,13 +158,13 @@ app.post("/register", async (req, res) => {
                 profileImage: profileImage || null
             }
         });
-        
+
         const emailSent = await sendOTPEmail(email, otp, name);
-        
+
         if (!emailSent) {
             return res.status(500).json({ error: "Failed to send OTP email" });
         }
-        
+
         res.status(200).json({
             message: "OTP sent to your email. Please verify to complete registration.",
             email: email
@@ -180,18 +178,18 @@ app.post("/register", async (req, res) => {
 // ========== VERIFY OTP API ==========
 app.post("/verify-otp", async (req, res) => {
     const { email, otp } = req.body;
-    
+
     if (!email || !otp) {
         return res.status(400).json({ error: "Email and OTP are required" });
     }
-    
+
     try {
         const storedData = otpStore.get(email);
-        
+
         if (!storedData) {
             return res.status(400).json({ error: "OTP expired or not found. Please register again." });
         }
-        
+
         if (Date.now() > storedData.expiry) {
             otpStore.delete(email);
             return res.status(400).json({ error: "OTP has expired. Please register again." });
@@ -400,7 +398,7 @@ const activeChat = {};
 io.on("connection", (socket) => {
     const userId = socket.userid?.toString();
     socket.join(userId);
-    
+
     socket.on("joinChat", (receiverID) => {
         const receiverIdStr = receiverID.toString();
         activeChat[userId] = receiverIdStr;
@@ -417,7 +415,7 @@ io.on("connection", (socket) => {
             console.log(err)
         }
     })
-    
+
     socket.on("send_message", async ({ text, id }) => {
         try {
             if (!text || !id) return;
@@ -429,7 +427,7 @@ io.on("connection", (socket) => {
                 receiver: receiverId,
                 text
             });
-            
+
             io.to(receiverId).emit("receive_message", {
                 text,
                 sender: senderId,
@@ -440,7 +438,7 @@ io.on("connection", (socket) => {
             console.error("Message error:", err);
         }
     });
-    
+
     socket.on("disconnect", () => {
         delete activeChat[userId];
         for (let key in activeChat) {
