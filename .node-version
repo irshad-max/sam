@@ -1,0 +1,2 @@
+# .node-version file banao
+echo "20.18.0" > .node-version
