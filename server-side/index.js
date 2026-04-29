@@ -1,6 +1,8 @@
 // ========== IMPORTANT LIBRARIES ==========
+require('dotenv').config();  // ✅ Sabse pehle dotenv load karo
+
 const express = require("express")
-const bcrypt = require("bcrypt")  // ✅ Fixed: brcrypt -> bcrypt
+const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const cors = require("cors")
 const http = require("http");
@@ -15,6 +17,13 @@ const connectdDB = require("./data-base/db-starter")
 const User = require("./data-base/user-module")
 const request = require("./data-base/db-request")
 const Msg = require("./data-base/db-msg--collector")
+
+// ========== ENVIRONMENT VARIABLES (with fallbacks) ==========
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || "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";
+const EMAIL_USER = process.env.EMAIL_USER || "irshadmustafa659@gmail.com";
+const EMAIL_PASS = process.env.EMAIL_PASS || "zjyg ncsf ujvn jlqu";
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 // ========== EXPRESS APP SETUP ==========
 const app = express()
@@ -32,7 +41,6 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Fixed: _dirname use karo
 app.use("/uploads", express.static(path.join(_dirname, "uploads")));
 
 const storage = multer.diskStorage({
@@ -81,12 +89,12 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     }
 });
 
-// ========== EMAIL CONFIGURATION ==========
+// ========== EMAIL CONFIGURATION (Using env variables) ==========
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: "irshadmustafa659@gmail.com",
-        pass: "zjyg ncsf ujvn jlqu",
+        user: EMAIL_USER,    // ✅ Using env variable
+        pass: EMAIL_PASS,    // ✅ Using env variable
     },
 });
 
@@ -99,7 +107,7 @@ function generateOTP() {
 async function sendOTPEmail(email, otp, name) {
     try {
         await transporter.sendMail({
-            from: '"Your TALK_ANY_TIME" <irshadmustafa659@gmail.com>',
+            from: `"Your TALK_ANY_TIME" <${EMAIL_USER}>`,  // ✅ Using env variable
             to: email,
             subject: "Verify Your Email - OTP Code",
             html: `
@@ -148,7 +156,7 @@ app.post("/register", async (req, res) => {
             userData: {
                 name,
                 email,
-                password: await bcrypt.hash(password, 10),  // ✅ Fixed
+                password: await bcrypt.hash(password, 10),
                 profileImage: profileImage || null
             }
         });
@@ -205,7 +213,7 @@ app.post("/verify-otp", async (req, res) => {
 
         const token = jwt.sign(
             { _id: user._id, email: user.email },
-            "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",
+            JWT_SECRET,  // ✅ Using env variable
             { expiresIn: "7d" }
         );
 
@@ -269,11 +277,11 @@ app.post("/login", async (req, res) => {
     const { email, password } = req.body
     const verify = await User.findOne({ email })
     if (!verify) return res.status(401).json({ error: "Email is wrong" })
-    const ismatch = await bcrypt.compare(password, verify.password)  // ✅ Fixed
+    const ismatch = await bcrypt.compare(password, verify.password)
     if (!ismatch) return res.status(401).json({ error: "Password is wrong" })
     const token = jwt.sign(
         { _id: verify._id },
-        "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",
+        JWT_SECRET,  // ✅ Using env variable
         { expiresIn: "7d" }
     )
 
@@ -288,7 +296,7 @@ const auth = (req, res, next) => {
     try {
         const decode = jwt.verify(
             token,
-            "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"
+            JWT_SECRET  // ✅ Using env variable
         );
         req.userid = decode._id;
         next();
@@ -379,7 +387,7 @@ io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
     try {
-        const decode = jwt.verify(token, "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");
+        const decode = jwt.verify(token, JWT_SECRET);  // ✅ Using env variable
         socket.userid = decode._id;
         next();
     } catch (err) {
@@ -446,20 +454,19 @@ io.on("connection", (socket) => {
 // ========== STATIC FILES SERVING ==========
 app.use(express.static(path.join(_dirname, "client-side", "dist")));
 
-// ========== SPA CATCH-ALL ROUTE (Express 4 compatible) ==========
+// ========== SPA CATCH-ALL ROUTE ==========
 app.get('*', (req, res) => {
     res.sendFile(path.join(_dirname, "client-side", "dist", "index.html"));
 });
 
 // ========== SERVER START ==========
-const PORT = 3001;
-
 connectdDB()
     .then(() => {
         server.listen(PORT, () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
             console.log(`📁 Socket.IO ready`);
             console.log(`✅ Database connected`);
+            console.log(`🔧 Environment: ${NODE_ENV}`);
         });
     })
     .catch(err => {
