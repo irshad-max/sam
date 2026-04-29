@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
 // ✅ PRODUCTION URL - DIRECT (Same as Sidebar)
-const API_URL = "https://zento-384q.onrender.com";
+const API_URL = "https://linksy-tn3q.onrender.com";
 
 const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
   const emojis = [

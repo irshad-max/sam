@@ -3,7 +3,7 @@ import axios from 'axios'
 import RoboticPopup from './RoboticPopup'
 
 // ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://zento-384q.onrender.com";
+const API_URL = "https://linksy-tn3q.onrender.com";
 
 function Auth({ show, setToken }) {
   const [isLogin, setIsLogin] = useState(true)

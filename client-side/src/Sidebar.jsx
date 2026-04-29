@@ -3,7 +3,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 
 // ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://zento-384q.onrender.com";
+const API_URL = "https://linksy-tn3q.onrender.com";
 
 const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => {
     const [users, setUsers] = useState([]);
