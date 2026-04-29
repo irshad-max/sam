@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server-side/server.js",
-    "build": "npm install && cd client-side && npm ci && npm run build",
-    "start": "node server-side/server.js"
+    "dev": "nodemon server-side/index.js",
+    "build": "npm install && cd client-side && npm install && npm run build",
+    "start": "node server-side/index.js"
   },
   "engines": {
     "node": "20.18.0",
