@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import RoboticPopup from './RoboticPopup'
 
+// ✅ PRODUCTION URL - DIRECT
+const API_URL = "https://mern-project-stj7.onrender.com";
+
 function Auth({ show, setToken }) {
   const [isLogin, setIsLogin] = useState(true)
   const [name, setName] = useState('')
@@ -73,7 +76,6 @@ function Auth({ show, setToken }) {
   }
 
   const handleSendOTP = async (name, email, password, image) => {
-    console.log("📧 Sending OTP request...")
     
     try {
       let imageBase64 = null
@@ -81,14 +83,13 @@ function Auth({ show, setToken }) {
         imageBase64 = await imageToBase64(image)
       }
       
-      const res = await axios.post("http://localhost:3001/register", {
+      // ✅ FIXED: Production URL
+      const res = await axios.post(`${API_URL}/register`, {
         name,
         email,
         password,
         profileImage: imageBase64
       })
-      
-      console.log("✅ Response:", res.data)
       
       if (res.data.message) {
         setTempName(name)
@@ -105,16 +106,14 @@ function Auth({ show, setToken }) {
   }
 
   const handleVerifyOTP = async () => {
-    console.log("🔐 Verifying OTP...")
     
     try {
-      const res = await axios.post("http://localhost:3001/verify-otp", {
+      // ✅ FIXED: Production URL
+      const res = await axios.post(`${API_URL}/verify-otp`, {
         email: tempEmail,
         otp: otp,
         profileImage: tempImage
       })
-      
-      console.log("✅ Verification response:", res.data)
       
       if (res.data.token) {
         localStorage.setItem("token", res.data.token)
@@ -136,10 +135,10 @@ function Auth({ show, setToken }) {
   }
 
   const handleResendOTP = async () => {
-    console.log("📧 Resending OTP...")
     
     try {
-      const res = await axios.post("http://localhost:3001/resend-otp", {
+      // ✅ FIXED: Production URL
+      const res = await axios.post(`${API_URL}/resend-otp`, {
         email: tempEmail
       })
       
@@ -154,11 +153,11 @@ function Auth({ show, setToken }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log("📝 Form submitted, isLogin:", isLogin)
     
     if (isLogin) {
       try {
-        const res = await axios.post("http://localhost:3001/login", {
+        // ✅ FIXED: Production URL
+        const res = await axios.post(`${API_URL}/login`, {
           email,
           password
         })

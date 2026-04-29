@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import ChatArea from './chatarea'
 
+// ✅ PRODUCTION URL - DIRECT
+const API_URL = "https://mern-project-stj7.onrender.com";
+
 function App() {
   const [show, setshow] = useState(false)
   const [token, setToken] = useState("")
@@ -22,7 +25,8 @@ function App() {
   }, [])
 
   const auth = (data) => { 
-    axios.post("http://localhost:3001/register", {
+    // ✅ FIXED: Production URL
+    axios.post(`${API_URL}/register`, {
       name: data.name,
       email: data.email,
       password: data.password,
@@ -37,8 +41,9 @@ function App() {
   const fetchmsg = async (id) => {
     if (!id || !token) return;
     try {
+      // ✅ FIXED: Production URL
       const res = await axios.post(
-        "http://localhost:3001/fetchmsg",
+        `${API_URL}/fetchmsg`,
         { receiver: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );

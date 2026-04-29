@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
+// ✅ PRODUCTION URL - DIRECT
+const API_URL = "https://mern-project-stj7.onrender.com";
+
 const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => {
     const [users, setUsers] = useState([]);
     const [search, setSearch] = useState("");
@@ -18,11 +21,6 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const [showToast, setShowToast] = useState(false);
     const socketRef = useRef(null);
 
-    // Default avatar generator
-    const getAvatarUrl = (name) => {
-        return `https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHXDwhB6qPo7H6iSoa5TXCjhQrUeN43KDu3XwZX5KPg&s=${encodeURIComponent(name || 'User')}`;
-    };
-
     const showToastMessage = (msg, isError = false) => {
         setToastMsg(msg);
         setShowToast(true);
@@ -37,7 +35,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     useEffect(() => {
         if (!token) return;
-        const socket = io("http://localhost:3001", {
+        const socket = io(API_URL, {  // ✅ FIXED
             auth: { token }
         });
         socketRef.current = socket;
@@ -61,13 +59,13 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     }, [token]);
 
     const fetchUsers = async () => {
-        const res = await axios.post("http://localhost:3001/users");
+        const res = await axios.post(`${API_URL}/users`);  // ✅ FIXED
         setUsers(res.data);
     };
 
     const fetchRequests = async () => {
         const res = await axios.post(
-            "http://localhost:3001/request-show",
+            `${API_URL}/request-show`,  // ✅ FIXED
             {},
             { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -76,7 +74,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     const fetchFriends = async () => {
         try {
-            const res = await axios.get("http://localhost:3001/friends", {
+            const res = await axios.get(`${API_URL}/friends`, {  // ✅ FIXED
                 headers: { Authorization: `Bearer ${token}` }
             });
             setFriends(res.data);
@@ -90,7 +88,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const sendRequest = async (receiverId) => {
         try {
             await axios.post(
-                "http://localhost:3001/request",
+                `${API_URL}/request`,  // ✅ FIXED
                 { receiver: receiverId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -105,7 +103,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const confirmRequest = async (requestId) => {
         try {
             await axios.post(
-                `http://localhost:3001/accept-request/${requestId}`,
+                `${API_URL}/accept-request/${requestId}`,  // ✅ FIXED
                 {},
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -449,6 +447,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                                             src={r.sender.profileImage}
                                             alt="avatar"
                                             style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
+                                            onError={(e) => { e.target.src = "https://via.placeholder.com/32" }}
                                         />
                                         <span>{r.sender.name}</span>
                                     </div>
@@ -484,6 +483,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                                     src={f.profileImage}
                                     alt="avatar"
                                     style={dynamicStyles.friendAvatarImage}
+                                    onError={(e) => { e.target.src = "https://via.placeholder.com/40" }}
                                 />
                             </div>
                             <div style={{ flex: 1 }}>
@@ -516,6 +516,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                                             src={u.profileImage}
                                             alt="avatar"
                                             style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
+                                            onError={(e) => { e.target.src = "https://via.placeholder.com/35" }}
                                         />
                                         <span>{u.name}</span>
                                     </div>
