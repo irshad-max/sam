@@ -90,7 +90,6 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 });
 
 // ========== EMAIL CONFIGURATION (Using env variables) ==========
-const EMAIL_PASS = process.env.EMAIL_PASS;   // no fallback
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
