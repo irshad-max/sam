@@ -1,5 +1,5 @@
-// ========== IMPORTANT LIBRARIES ==========
-require('dotenv').config();  // ✅ Sabse pehle dotenv load karo
+// ========== IMPORTANT LIBRABIES ==========
+require('dotenv').config();
 
 const express = require("express")
 const bcrypt = require("bcrypt")
@@ -18,11 +18,11 @@ const User = require("./data-base/user-module")
 const request = require("./data-base/db-request")
 const Msg = require("./data-base/db-msg--collector")
 
-// ========== ENVIRONMENT VARIABLES (with fallbacks) ==========
+// ========== ENVIRONMENT VARIABLES (NO FALLBACKS FOR PASSWORDS) ==========
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "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";
 const EMAIL_USER = process.env.EMAIL_USER || "irshadmustafa659@gmail.com";
-const EMAIL_PASS = process.env.EMAIL_PASS || "zjyg ncsf ujvn jlqu";
+const EMAIL_PASS = process.env.EMAIL_PASS;  // ✅ NO FALLBACK - MUST BE SET IN RENDER
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // ========== EXPRESS APP SETUP ==========
@@ -89,10 +89,13 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     }
 });
 
-// ========== EMAIL CONFIGURATION (Using env variables) ==========
+// ========== EMAIL CONFIGURATION (FIXED - NO DUPLICATE) ==========
 const transporter = nodemailer.createTransport({
     service: "gmail",
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    auth: { 
+        user: EMAIL_USER, 
+        pass: EMAIL_PASS   // ✅ Only ONE declaration
+    },
 });
 
 const otpStore = new Map();
@@ -104,7 +107,7 @@ function generateOTP() {
 async function sendOTPEmail(email, otp, name) {
     try {
         await transporter.sendMail({
-            from: `"Your TALK_ANY_TIME" <${EMAIL_USER}>`,  // ✅ Using env variable
+            from: `"Your TALK_ANY_TIME" <${EMAIL_USER}>`,
             to: email,
             subject: "Verify Your Email - OTP Code",
             html: `
@@ -210,7 +213,7 @@ app.post("/verify-otp", async (req, res) => {
 
         const token = jwt.sign(
             { _id: user._id, email: user.email },
-            JWT_SECRET,  // ✅ Using env variable
+            JWT_SECRET,
             { expiresIn: "7d" }
         );
 
@@ -278,7 +281,7 @@ app.post("/login", async (req, res) => {
     if (!ismatch) return res.status(401).json({ error: "Password is wrong" })
     const token = jwt.sign(
         { _id: verify._id },
-        JWT_SECRET,  // ✅ Using env variable
+        JWT_SECRET,
         { expiresIn: "7d" }
     )
 
@@ -291,10 +294,7 @@ const auth = (req, res, next) => {
     if (!authHeader) return res.status(401).send("No token");
     const token = authHeader.split(" ")[1];
     try {
-        const decode = jwt.verify(
-            token,
-            JWT_SECRET  // ✅ Using env variable
-        );
+        const decode = jwt.verify(token, JWT_SECRET);
         req.userid = decode._id;
         next();
     } catch (err) {
@@ -384,7 +384,7 @@ io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
     try {
-        const decode = jwt.verify(token, JWT_SECRET);  // ✅ Using env variable
+        const decode = jwt.verify(token, JWT_SECRET);
         socket.userid = decode._id;
         next();
     } catch (err) {
