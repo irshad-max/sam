@@ -26,10 +26,14 @@ function Auth({ show, setToken }) {
   const [popup, setPopup] = useState({ show: false, message: '', type: '' })
 
   const showRoboticPopup = (message, type = 'info') => {
+    console.log(`[POPUP] ${type}: ${message}`);
     setPopup({ show: true, message, type })
   }
 
   useEffect(() => {
+    console.log("[AUTH] Component mounted");
+    console.log(`[AUTH] API_URL: ${API_URL}`);
+    
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768)
     }
@@ -41,25 +45,29 @@ function Auth({ show, setToken }) {
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0]
+    console.log("[IMAGE] File selected:", file?.name);
     if (file) {
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
+        console.log("[IMAGE] File too large:", file.size);
         showRoboticPopup("⚠️ IMAGE SIZE MUST BE LESS THAN 2MB ⚠️", "error")
         return
       }
       
-      // Check file type
       if (!file.type.startsWith('image/')) {
+        console.log("[IMAGE] Invalid file type:", file.type);
         showRoboticPopup("⚠️ ONLY IMAGE FILES ARE ALLOWED ⚠️", "error")
         return
       }
       
       setProfileImage(file)
       
-      // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
+        console.log("[IMAGE] Preview created successfully");
         setImagePreview(reader.result)
+      }
+      reader.onerror = (error) => {
+        console.error("[IMAGE] FileReader error:", error);
       }
       reader.readAsDataURL(file)
     }
@@ -67,55 +75,100 @@ function Auth({ show, setToken }) {
 
   // Convert image to base64
   const imageToBase64 = (file) => {
+    console.log("[IMAGE] Converting to base64...");
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = error => reject(error)
+      reader.onload = () => {
+        console.log("[IMAGE] Base64 conversion successful");
+        resolve(reader.result)
+      }
+      reader.onerror = error => {
+        console.error("[IMAGE] Base64 conversion error:", error);
+        reject(error)
+      }
     })
   }
 
   const handleSendOTP = async (name, email, password, image) => {
+    console.log("=========================================");
+    console.log("[REGISTER] Starting registration process");
+    console.log(`[REGISTER] Name: ${name}`);
+    console.log(`[REGISTER] Email: ${email}`);
+    console.log(`[REGISTER] Password length: ${password?.length || 0}`);
+    console.log(`[REGISTER] Has image: ${!!image}`);
+    console.log(`[REGISTER] API_URL: ${API_URL}`);
+    console.log(`[REGISTER] Full URL: ${API_URL}/register`);
     
     try {
       let imageBase64 = null
       if (image) {
+        console.log("[REGISTER] Converting image to base64...");
         imageBase64 = await imageToBase64(image)
       }
       
-      // ✅ FIXED: Production URL
-      const res = await axios.post(`${API_URL}/register`, {
+      const requestData = {
         name,
         email,
         password,
         profileImage: imageBase64
-      })
+      };
+      console.log("[REGISTER] Request data prepared");
+      console.log("[REGISTER] Sending POST request...");
+      
+      const res = await axios.post(`${API_URL}/register`, requestData);
+      
+      console.log("[REGISTER] Response received:", res.status, res.statusText);
+      console.log("[REGISTER] Response data:", res.data);
       
       if (res.data.message) {
+        console.log("[REGISTER] Registration successful, OTP sent");
         setTempName(name)
         setTempEmail(email)
         setTempPassword(password)
         setTempImage(imageBase64)
         setShowOTP(true)
         showRoboticPopup("⚡ OTP TRANSMITTED TO TARGET EMAIL ⚡", "success")
+      } else {
+        console.log("[REGISTER] Unexpected response format:", res.data);
+        showRoboticPopup("❌ UNEXPECTED RESPONSE FROM SERVER ❌", "error");
       }
     } catch (err) {
-      console.log("❌ Error:", err)
-      showRoboticPopup(err.response?.data?.error || "❌ REGISTRATION PROTOCOL FAILED ❌", "error")
+      console.log("=========================================");
+      console.log("[REGISTER] ❌ ERROR OCCURRED ❌");
+      console.log(`[REGISTER] Error type: ${err.name || 'Unknown'}`);
+      console.log(`[REGISTER] Error message: ${err.message}`);
+      console.log(`[REGISTER] Response status: ${err.response?.status || 'No response'}`);
+      console.log(`[REGISTER] Response data:`, err.response?.data || 'No data');
+      console.log(`[REGISTER] Error config URL: ${err.config?.url || 'Unknown'}`);
+      console.log(`[REGISTER] Error config method: ${err.config?.method || 'Unknown'}`);
+      console.log("=========================================");
+      
+      const errorMessage = err.response?.data?.error || err.message || "❌ REGISTRATION PROTOCOL FAILED ❌";
+      showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleVerifyOTP = async () => {
+    console.log("=========================================");
+    console.log("[VERIFY] Starting OTP verification");
+    console.log(`[VERIFY] Email: ${tempEmail}`);
+    console.log(`[VERIFY] OTP: ${otp}`);
+    console.log(`[VERIFY] Has profile image: ${!!tempImage}`);
     
     try {
-      // ✅ FIXED: Production URL
+      console.log("[VERIFY] Sending verification request...");
       const res = await axios.post(`${API_URL}/verify-otp`, {
         email: tempEmail,
         otp: otp,
         profileImage: tempImage
       })
       
+      console.log("[VERIFY] Response received:", res.status);
+      console.log("[VERIFY] Response data:", res.data);
+      
       if (res.data.token) {
+        console.log("[VERIFY] ✅ Verification successful! Token received");
         localStorage.setItem("token", res.data.token)
         setToken(res.data.token)
         setShowOTP(false)
@@ -127,59 +180,96 @@ function Auth({ show, setToken }) {
         setProfileImage(null)
         setImagePreview(null)
         showRoboticPopup("✅ ACCESS GRANTED! USER REGISTERED ✅", "success")
+      } else {
+        console.log("[VERIFY] No token in response:", res.data);
+        showRoboticPopup("❌ VERIFICATION FAILED - NO TOKEN ❌", "error");
       }
     } catch (err) {
-      console.log("❌ Verification error:", err)
-      showRoboticPopup(err.response?.data?.error || "❌ INVALID OTP CODE ❌", "error")
+      console.log("=========================================");
+      console.log("[VERIFY] ❌ VERIFICATION ERROR ❌");
+      console.log(`[VERIFY] Error message: ${err.message}`);
+      console.log(`[VERIFY] Response status: ${err.response?.status || 'No response'}`);
+      console.log(`[VERIFY] Response data:`, err.response?.data || 'No data');
+      console.log("=========================================");
+      
+      const errorMessage = err.response?.data?.error || "❌ INVALID OTP CODE ❌";
+      showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleResendOTP = async () => {
+    console.log("[RESEND] Requesting new OTP for:", tempEmail);
     
     try {
-      // ✅ FIXED: Production URL
       const res = await axios.post(`${API_URL}/resend-otp`, {
         email: tempEmail
       })
       
+      console.log("[RESEND] Response:", res.status, res.data);
+      
       if (res.data.message) {
+        console.log("[RESEND] ✅ New OTP sent successfully");
         showRoboticPopup("🔄 NEW OTP CODE GENERATED & SENT 🔄", "info")
       }
     } catch (err) {
-      console.log("❌ Resend error:", err)
+      console.log("[RESEND] ❌ Error:", err.message);
+      console.log("[RESEND] Response data:", err.response?.data);
       showRoboticPopup("⚠️ OTP RESEND FAILED ⚠️", "error")
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log("=========================================");
+    console.log(`[FORM] Form submitted, isLogin: ${isLogin}`);
     
     if (isLogin) {
+      console.log("[LOGIN] Attempting login...");
+      console.log(`[LOGIN] Email: ${email}`);
+      console.log(`[LOGIN] Password length: ${password?.length || 0}`);
+      console.log(`[LOGIN] API_URL: ${API_URL}`);
+      console.log(`[LOGIN] Full URL: ${API_URL}/login`);
+      
       try {
-        // ✅ FIXED: Production URL
         const res = await axios.post(`${API_URL}/login`, {
           email,
           password
         })
         
+        console.log("[LOGIN] Response:", res.status, res.data);
+        
         if (res.data.token) {
+          console.log("[LOGIN] ✅ Login successful");
           localStorage.setItem("token", res.data.token)
           setToken(res.data.token)
           show(true)
           showRoboticPopup("🔓 SYSTEM ACCESS GRANTED 🔓", "success")
         }
       } catch (err) {
-        console.log("Login error:", err)
-        showRoboticPopup(err.response?.data?.error || "❌ LOGIN PROTOCOL FAILED ❌", "error")
+        console.log("=========================================");
+        console.log("[LOGIN] ❌ LOGIN ERROR ❌");
+        console.log(`[LOGIN] Error message: ${err.message}`);
+        console.log(`[LOGIN] Response status: ${err.response?.status || 'No response'}`);
+        console.log(`[LOGIN] Response data:`, err.response?.data || 'No data');
+        console.log(`[LOGIN] Request URL: ${err.config?.url || 'Unknown'}`);
+        console.log("=========================================");
+        
+        const errorMessage = err.response?.data?.error || "❌ LOGIN PROTOCOL FAILED ❌";
+        showRoboticPopup(errorMessage, "error")
       }
     } else {
       if (!name || !email || !password) {
+        console.log("[FORM] Missing fields:", { name: !!name, email: !!email, password: !!password });
         showRoboticPopup("⚠️ ALL FIELDS REQUIRED ⚠️", "error")
         return
       }
+      console.log("[FORM] Calling handleSendOTP...");
       handleSendOTP(name, email, password, profileImage)
     }
   }
+
+  // ... rest of the styles and return statement remains the same ...
+  // (keeping the same styles and JSX as before)
 
   const getResponsiveStyles = () => {
     const width = window.innerWidth
@@ -287,7 +377,6 @@ function Auth({ show, setToken }) {
       background: "rgba(0, 0, 0, 0.8)",
       color: "#00ff00"
     },
-    // Image upload styles
     imageUploadContainer: {
       display: "flex",
       flexDirection: "column",
@@ -440,7 +529,6 @@ function Auth({ show, setToken }) {
           </p>
           
           <form onSubmit={handleSubmit}>
-            {/* Image Upload Section - Only for Registration */}
             {!isLogin && (
               <div style={styles.imageUploadContainer}>
                 {imagePreview ? (
@@ -540,14 +628,8 @@ function Auth({ show, setToken }) {
 
       <style>{`
         @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         
         input:focus {
@@ -568,12 +650,8 @@ function Auth({ show, setToken }) {
         }
         
         @media (max-width: 768px) {
-          input {
-            font-size: 16px !important;
-          }
-          button {
-            font-size: 16px !important;
-          }
+          input { font-size: 16px !important; }
+          button { font-size: 16px !important; }
         }
       `}</style>
     </>
