@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server-side/server.js",
-    "build": "npm install && npm install --prefix client-side && npm run build --prefix client-side",
+    "build": "npm install && cd client-side && npm ci && npm run build",
     "start": "node server-side/server.js"
   },
   "engines": {
