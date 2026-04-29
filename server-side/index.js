@@ -91,11 +91,19 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 
 // ========== EMAIL CONFIGURATION (FIXED - NO DUPLICATE) ==========
 const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: { 
         user: EMAIL_USER, 
-        pass: EMAIL_PASS   // ✅ Only ONE declaration
+        pass: EMAIL_PASS
     },
+    tls: {
+        rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
 });
 
 const otpStore = new Map();
