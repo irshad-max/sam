@@ -22,10 +22,6 @@ const app = express()
 // Serve frontend
 app.use(express.static(path.join(__dirname, "../client-side/dist")))
 
-app.get("/*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
-})
-
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ limit: '10mb', extended: true }))
@@ -90,7 +86,7 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.EMAIL_USER|| "irshadmustafa659@gmail.com",
+        user: process.env.EMAIL_USER || "irshadmustafa659@gmail.com",
         pass: process.env.EMAIL_PASS || "qhdylolhcjgpltav",
     },
 });
@@ -449,4 +445,7 @@ io.on("connection", (socket) => {
     });
 });
 
+app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
+})
 module.exports = server;
