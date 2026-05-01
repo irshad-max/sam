@@ -445,12 +445,10 @@ io.on("connection", (socket) => {
 });
 // Serve frontend
 // ========== STATIC FILES SERVING ==========
-const __dirname = path.resolve();
-const path = require("path")
+// Serve frontend
 app.use(express.static(path.join(__dirname, "../client-side/dist")))
+
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
 })
-console.log("Current directory:", __dirname);
-console.log("Dist path:", path.join(__dirname, "client-side", "dist"));
 module.exports = server;
