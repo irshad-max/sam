@@ -22,7 +22,7 @@ function App() {
   }, [])
 
   const auth = (data) => { 
-    axios.post("http://localhost:3001/register", {
+    axios.post("https://livechat-zfsq.onrender.com/register", {
       name: data.name,
       email: data.email,
       password: data.password,
@@ -38,7 +38,7 @@ function App() {
     if (!id || !token) return;
     try {
       const res = await axios.post(
-        "http://localhost:3001/fetchmsg",
+        "https://livechat-zfsq.onrender.com/fetchmsg",
         { receiver: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );

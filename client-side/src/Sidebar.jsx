@@ -37,7 +37,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     useEffect(() => {
         if (!token) return;
-        const socket = io("http://localhost:3001", {
+        const socket = io("https://livechat-zfsq.onrender.com", {
             auth: { token }
         });
         socketRef.current = socket;
@@ -61,13 +61,13 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     }, [token]);
 
     const fetchUsers = async () => {
-        const res = await axios.post("http://localhost:3001/users");
+        const res = await axios.post("https://livechat-zfsq.onrender.com/users");
         setUsers(res.data);
     };
 
     const fetchRequests = async () => {
         const res = await axios.post(
-            "http://localhost:3001/request-show",
+            "https://livechat-zfsq.onrender.com/request-show",
             {},
             { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -76,7 +76,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     const fetchFriends = async () => {
         try {
-            const res = await axios.get("http://localhost:3001/friends", {
+            const res = await axios.get("https://livechat-zfsq.onrender.com/friends", {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setFriends(res.data);
@@ -90,7 +90,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const sendRequest = async (receiverId) => {
         try {
             await axios.post(
-                "http://localhost:3001/request",
+                "https://livechat-zfsq.onrender.com/request",
                 { receiver: receiverId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -105,7 +105,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const confirmRequest = async (requestId) => {
         try {
             await axios.post(
-                `http://localhost:3001/accept-request/${requestId}`,
+                `https://livechat-zfsq.onrender.com/accept-request/${requestId}`,
                 {},
                 { headers: { Authorization: `Bearer ${token}` } }
             );

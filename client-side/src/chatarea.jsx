@@ -88,7 +88,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   // Socket connection
   useEffect(() => {
     if (!token) return;
-    socketRef.current = io("http://localhost:3001", {
+    socketRef.current = io("https://livechat-zfsq.onrender.com", {
       auth: { token }
     });
 
