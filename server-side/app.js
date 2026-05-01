@@ -445,10 +445,14 @@ io.on("connection", (socket) => {
 });
 // Serve frontend
 // ========== STATIC FILES SERVING ==========
-// Serve frontend
-app.use(express.static(path.join(__dirname, "../client-side/dist")))
 
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
-})
+const root = process.cwd();
+
+// ✅ static files FIRST
+app.use(express.static(path.join(root, "client-side/dist")));
+
+// ✅ fallback AFTER static
+app.get("*", (req, res) => {
+  res.sendFile(path.join(root, "client-side/dist/index.html"));
+});
 module.exports = server;
