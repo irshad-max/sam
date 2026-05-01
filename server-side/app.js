@@ -19,8 +19,7 @@ const Msg = require("./data-base/db-msg--collector")
 
 //function
 const app = express()
-// Serve frontend
-app.use(express.static(path.join(__dirname, "../client-side/dist")))
+
 
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
@@ -444,8 +443,13 @@ io.on("connection", (socket) => {
         }
     });
 });
-
+// Serve frontend
+// ========== STATIC FILES SERVING ==========
+const _dirname = path.resolve();
+app.use(express.static(path.join(_dirname, "client-side", "dist")));
 app.get((req, res) => {
     res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
 })
+console.log("Current directory:", __dirname);
+console.log("Dist path:", path.join(__dirname, "client-side", "dist"));
 module.exports = server;
