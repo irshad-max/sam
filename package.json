@@ -5,18 +5,13 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-<<<<<<< HEAD
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-=======
     "dev": "nodemon server-side/index.js",
-    "build": "npm install && cd client-side && npm install && npm run build",
+    "build": "npm install --include=dev && cd client-side && npm install --include=dev && npm run build",
     "start": "node server-side/index.js"
   },
   "engines": {
-    "node": "20.18.0",
+    "node": "22.14.0",
     "npm": "10.x"
->>>>>>> f39ab90b7bf5dd5313d848e7eb25ac14a0be2fa8
   },
   "keywords": [],
   "author": "",
@@ -38,8 +33,4 @@
     "@types/multer": "^2.1.0",
     "nodemon": "^3.1.14"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f39ab90b7bf5dd5313d848e7eb25ac14a0be2fa8
