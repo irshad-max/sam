@@ -36,7 +36,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -111,8 +111,8 @@ const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false, // true for 465, false for other ports
-    auth: { 
-        user: EMAIL_USER, 
+    auth: {
+        user: EMAIL_USER,
         pass: EMAIL_PASS
     },
     tls: {
@@ -474,11 +474,17 @@ io.on("connection", (socket) => {
 });
 
 // ========== STATIC FILES SERVING ==========
-app.use(express.static(path.join(_dirname, "client-side", "dist")));
+const distPath = path.join(root, "client-side", "dist");
 
-// ========== SPA CATCH-ALL ROUTE ==========
-app.get('*', (req, res) => {
-    res.sendFile(path.join(_dirname, "client-side", "dist", "index.html"));
+// serve assets FIRST
+app.use("/assets", express.static(path.join(distPath, "assets")));
+
+// serve main files
+app.use(express.static(distPath));
+
+// fallback
+app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
 });
 
 // ========== SERVER START ==========
