@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-// ✅ PRODUCTION URL - DIRECT (Same as Sidebar)
-const API_URL = "https://linksy-tn3q.onrender.com";
-
 const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
   const emojis = [
-    '🐦‍🔥', '⃤💘', '⃟👋', '⃝🌷', '🦅', '﷽', 'जय श्री राम', '☬', '♕', '🌹',
+    '🐦‍🔥', '⃤💘', '⃟👋', '⃝🌷', '🦅', '♕', '🌹',
     '🏵️', '💮', '💐', '元', '🃏', '🎴', '🎭', '🏴‍☠️', '🏴', '🏳️', '🌌',
     '❄️', '🌘', '⨌', '⏰', '✂️', '💴', '🎸', '🎶', '👽', '🕉️',
-    '🕌', '🧿', '🎃', '🦄', '🧞', '🍭', '🔮', '🎭', '🕷️', '⛱', 
-    '🌀', '🎯', '❎', '✅', '📵', '☎','🧙‍♂️','👨‍🦼','✍︎','✌︎','🎰',
-    '♞','🕹','♝','🎻','🂫','🂡','🀢','🀣','🀤','🦉','🕶️','💍','💄',
-    '🧥','🥻'
+    '🕌', '🧿', '🎃', '🦄', '🧞', '🍭', '🔮', '🎭', '🕷️', '⛱',
+    '🌀', '🎯', '❎', '✅', '📵', '☎', '🧙‍♂️', '👨‍🦼', '✍︎', '✌︎', '🎰',
+    '♞', '🕹', '♝', '🎻', '🂫', '🂡', '🀢', '🀣', '🀤', '🦉', '🕶️', '💍', '💄',
+    '🧥'
   ];
 
   return (
@@ -88,10 +85,10 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket connection - ✅ FIXED: Production URL
+  // Socket connection
   useEffect(() => {
     if (!token) return;
-    socketRef.current = io(API_URL, {  // ✅ Changed from localhost
+    socketRef.current = io("http://localhost:3001", {
       auth: { token }
     });
 

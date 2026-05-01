@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import ChatArea from './chatarea'
 
-// ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://linksy-tn3q.onrender.com";
-
 function App() {
   const [show, setshow] = useState(false)
   const [token, setToken] = useState("")
@@ -25,8 +22,7 @@ function App() {
   }, [])
 
   const auth = (data) => { 
-    // ✅ FIXED: Production URL
-    axios.post(`${API_URL}/register`, {
+    axios.post("http://localhost:3001/register", {
       name: data.name,
       email: data.email,
       password: data.password,
@@ -41,9 +37,8 @@ function App() {
   const fetchmsg = async (id) => {
     if (!id || !token) return;
     try {
-      // ✅ FIXED: Production URL
       const res = await axios.post(
-        `${API_URL}/fetchmsg`,
+        "http://localhost:3001/fetchmsg",
         { receiver: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -59,8 +54,7 @@ function App() {
     setShowChat(false)
     setSelectedUser({
       name: userData.name,
-      id: userData.id,
-      profileImage:userData.profileImage
+      id: userData.id
     });
     fetchmsg(userData.id).then(() => {
       setTimeout(() => setShowChat(true), 150)
@@ -89,7 +83,6 @@ function App() {
               <div style={styles.chatMobileWrapper}>
                 <ChatArea 
                   selectedUser={selectedUser.name} 
-                  Userprofile={selectedUser.profileImage} 
                   id={selectedUser.id} 
                   token={token} 
                   prev_msg={message} 
