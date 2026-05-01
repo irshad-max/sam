@@ -19,7 +19,12 @@ const Msg = require("./data-base/db-msg--collector")
 
 //function
 const app = express()
+// Serve frontend
+app.use(express.static(path.join(__dirname, "../client-side/dist")))
 
+app.get("/*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client-side/dist/index.html"))
+})
 
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
