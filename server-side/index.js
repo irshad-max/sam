@@ -474,19 +474,22 @@ io.on("connection", (socket) => {
 });
 
 // ========== STATIC FILES SERVING ==========
+// ========== STATIC FILES SERVING ==========
+
+// ✅ Define root properly
+const root = process.cwd();
 const distPath = path.join(root, "client-side", "dist");
 
-// serve assets FIRST
-app.use("/assets", express.static(path.join(distPath, "assets")));
+console.log("Serving static from:", distPath);
+console.log("Dist exists:", fs.existsSync(distPath));
 
-// serve main files
+// ✅ Serve static files
 app.use(express.static(distPath));
 
-// fallback
-app.get("*", (req, res) => {
+// ✅ SPA catch-all route (MUST BE LAST)
+app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
 });
-
 // ========== SERVER START ==========
 connectdDB()
     .then(() => {
