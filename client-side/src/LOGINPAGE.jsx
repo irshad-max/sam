@@ -3,7 +3,7 @@ import axios from 'axios'
 import RoboticPopup from './RoboticPopup'
 
 // ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://livechat-zfsq.onrender.com";
+const API_URL = "http://localhost:3001";
 
 function Auth({ show, setToken }) {
   const [isLogin, setIsLogin] = useState(true)

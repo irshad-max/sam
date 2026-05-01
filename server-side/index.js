@@ -36,7 +36,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-    origin: function (origin, callback) {
+    origin: function(origin, callback) {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -111,8 +111,8 @@ const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false, // true for 465, false for other ports
-    auth: {
-        user: EMAIL_USER,
+    auth: { 
+        user: EMAIL_USER, 
         pass: EMAIL_PASS
     },
     tls: {
@@ -474,22 +474,13 @@ io.on("connection", (socket) => {
 });
 
 // ========== STATIC FILES SERVING ==========
-// ========== STATIC FILES SERVING ==========
+app.use(express.static(path.join(_dirname, "client-side", "dist")));
 
-// ✅ Define root properly
-const root = process.cwd();
-const distPath = path.join(root, "client-side", "dist");
-
-console.log("Serving static from:", distPath);
-console.log("Dist exists:", fs.existsSync(distPath));
-
-// ✅ Serve static files
-app.use(express.static(distPath));
-
-// ✅ SPA catch-all route (MUST BE LAST)
+// ========== SPA CATCH-ALL ROUTE ==========
 app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+    res.sendFile(path.join(_dirname, "client-side", "dist", "index.html"));
 });
+
 // ========== SERVER START ==========
 connectdDB()
     .then(() => {
