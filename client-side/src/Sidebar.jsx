@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
+// ✅ ADD THIS - API URL DEFINITION (MISSING!)
+const API_URL = "https://live-chat-q84d.onrender.com";
+
 const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => {
     const [users, setUsers] = useState([]);
     const [search, setSearch] = useState("");
@@ -18,11 +21,6 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const [showToast, setShowToast] = useState(false);
     const socketRef = useRef(null);
 
-    // Default avatar generator
-    const getAvatarUrl = (name) => {
-        return `https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHXDwhB6qPo7H6iSoa5TXCjhQrUeN43KDu3XwZX5KPg&s=${encodeURIComponent(name || 'User')}`;
-    };
-
     const showToastMessage = (msg, isError = false) => {
         setToastMsg(msg);
         setShowToast(true);
@@ -37,7 +35,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     useEffect(() => {
         if (!token) return;
-        const socket = io("https://live-chat-q84d.onrender.com", {
+        const socket = io(API_URL, {
             auth: { token }
         });
         socketRef.current = socket;
@@ -60,45 +58,54 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     }, [token]);
 
- const fetchUsers = async () => {
-    try {
-        const res = await axios.get(`${API_URL}/users`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        // ✅ Ensure users is always an array
-        const usersData = Array.isArray(res.data) ? res.data : [];
-        setUsers(usersData);
-    } catch (err) {
-        console.log("Fetch users error:", err);
-        setUsers([]);
-    }
-};
-    const fetchRequests = async () => {
-        const res = await axios.post(
-            "https://live-chat-q84d.onrender.com/request-show",
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setRequests(res.data);
-    };
-
-    const fetchFriends = async () => {
+    // ✅ FETCH USERS - FIXED
+    const fetchUsers = async () => {
         try {
-            const res = await axios.get("https://live-chat-q84d.onrender.com/friends", {
+            const res = await axios.get(`${API_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setFriends(res.data);
-            showToastMessage(`✅ Friends list updated (${res.data.length} friends)`);
+            const usersData = Array.isArray(res.data) ? res.data : [];
+            setUsers(usersData);
+        } catch (err) {
+            console.log("Fetch users error:", err);
+            setUsers([]);
+        }
+    };
+
+    // ✅ FETCH REQUESTS - FIXED
+    const fetchRequests = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/request-show`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const requestsData = Array.isArray(res.data) ? res.data : [];
+            setRequests(requestsData);
+        } catch (err) {
+            console.log("Fetch requests error:", err);
+            setRequests([]);
+        }
+    };
+
+    // ✅ FETCH FRIENDS - FIXED
+    const fetchFriends = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/friends`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const friendsData = Array.isArray(res.data) ? res.data : [];
+            setFriends(friendsData);
+            showToastMessage(`✅ Friends list updated (${friendsData.length} friends)`);
         } catch (err) {
             console.log("Fetch friends error:", err);
+            setFriends([]);
             showToastMessage("❌ Failed to fetch friends", true);
         }
     };
 
+    // ✅ SEND REQUEST - FIXED
     const sendRequest = async (receiverId) => {
         try {
-            await axios.post(
-                "https://live-chat-q84d.onrender.com/request",
+            await axios.post(`${API_URL}/request`,
                 { receiver: receiverId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -110,10 +117,10 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     };
 
+    // ✅ CONFIRM REQUEST - FIXED
     const confirmRequest = async (requestId) => {
         try {
-            await axios.post(
-                `https://live-chat-q84d.onrender.com/accept-request/${requestId}`,
+            await axios.post(`${API_URL}/accept-request/${requestId}`,
                 {},
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -126,7 +133,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     };
 
-    const handleSelectUser = async (id, name,profileImage) => {
+    const handleSelectUser = async (id, name, profileImage) => {
         setAnimateItem(id);
         setTimeout(() => setAnimateItem(null), 300);
 
@@ -153,10 +160,10 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         setUsers([]);
     };
 
-   // ✅ Safe filter - only if users is array
-const filteredUsers = Array.isArray(users) && users.length > 0 ? 
-    users.filter(u => u.name && u.name.toLowerCase().includes(search.toLowerCase())) : 
-    [];
+    // ✅ SAFE FILTER - FIXED
+    const filteredUsers = Array.isArray(users) && users.length > 0 ? 
+        users.filter(u => u.name && u.name.toLowerCase().includes(search.toLowerCase())) : 
+        [];
 
     const colorStyles = {
         primary: "#4f46e5",
@@ -455,11 +462,11 @@ const filteredUsers = Array.isArray(users) && users.length > 0 ?
                                 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                         <img
-                                            src={r.sender.profileImage}
+                                            src={r.sender?.profileImage || "https://via.placeholder.com/32"}
                                             alt="avatar"
                                             style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
                                         />
-                                        <span>{r.sender.name}</span>
+                                        <span>{r.sender?.name || "User"}</span>
                                     </div>
                                     <button onClick={() => confirmRequest(r._id)} style={{
                                         padding: "6px 16px", background: colorStyles.success,
@@ -490,9 +497,10 @@ const filteredUsers = Array.isArray(users) && users.length > 0 ?
                         }} onClick={() => handleSelectUser(f._id, f.name, f.profileImage)}>
                             <div className="friend-avatar" style={dynamicStyles.friendAvatar}>
                                 <img
-                                    src={f.profileImage}
+                                    src={f.profileImage || "https://via.placeholder.com/40"}
                                     alt="avatar"
                                     style={dynamicStyles.friendAvatarImage}
+                                    onError={(e) => { e.target.src = "https://via.placeholder.com/40"; }}
                                 />
                             </div>
                             <div style={{ flex: 1 }}>
@@ -506,37 +514,38 @@ const filteredUsers = Array.isArray(users) && users.length > 0 ?
                     ))
                 )}
 
-             {search && (
-    <>
-        <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
-        {!filteredUsers || filteredUsers.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                <span>😕 No users found</span>
-            </div>
-        ) : (
-            filteredUsers.map((u, index) => (
-                <div key={u._id} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px", background: colorStyles.surface, borderRadius: "12px",
-                    marginBottom: "8px"
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <img
-                            src={u.profileImage || "https://via.placeholder.com/35"}
-                            alt="avatar"
-                            style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
-                        />
-                        <span>{u.name || "User"}</span>
-                    </div>
-                    <button onClick={() => sendRequest(u._id)} style={{
-                        padding: "6px 16px", background: colorStyles.accent,
-                        border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer"
-                    }}>Add</button>
-                </div>
-            ))
-        )}
-    </>
-)}
+                {search && (
+                    <>
+                        <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
+                        {!filteredUsers || filteredUsers.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                                <span>😕 No users found</span>
+                            </div>
+                        ) : (
+                            filteredUsers.map((u, index) => (
+                                <div key={u._id} style={{
+                                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                                    padding: "10px", background: colorStyles.surface, borderRadius: "12px",
+                                    marginBottom: "8px"
+                                }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                        <img
+                                            src={u.profileImage || "https://via.placeholder.com/35"}
+                                            alt="avatar"
+                                            style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
+                                            onError={(e) => { e.target.src = "https://via.placeholder.com/35"; }}
+                                        />
+                                        <span>{u.name || "User"}</span>
+                                    </div>
+                                    <button onClick={() => sendRequest(u._id)} style={{
+                                        padding: "6px 16px", background: colorStyles.accent,
+                                        border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer"
+                                    }}>Add</button>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
             </div>
 
             {isMobile && <BottomNav />}
