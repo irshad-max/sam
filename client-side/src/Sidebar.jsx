@@ -60,11 +60,19 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     }, [token]);
 
-    const fetchUsers = async () => {
-        const res = await axios.post("https://live-chat-q84d.onrender.com/users");
-        setUsers(res.data);
-    };
-
+ const fetchUsers = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/users`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        // ✅ Ensure users is always an array
+        const usersData = Array.isArray(res.data) ? res.data : [];
+        setUsers(usersData);
+    } catch (err) {
+        console.log("Fetch users error:", err);
+        setUsers([]);
+    }
+};
     const fetchRequests = async () => {
         const res = await axios.post(
             "https://live-chat-q84d.onrender.com/request-show",
@@ -145,9 +153,10 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         setUsers([]);
     };
 
-    const filteredUsers = users.filter(
-        u => u.name.toLowerCase().includes(search.toLowerCase())
-    );
+   // ✅ Safe filter - only if users is array
+const filteredUsers = Array.isArray(users) && users.length > 0 ? 
+    users.filter(u => u.name && u.name.toLowerCase().includes(search.toLowerCase())) : 
+    [];
 
     const colorStyles = {
         primary: "#4f46e5",
@@ -497,37 +506,37 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                     ))
                 )}
 
-                {search && (
-                    <>
-                        <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
-                        {filteredUsers.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                                <span>😕 No users found</span>
-                            </div>
-                        ) : (
-                            filteredUsers.map((u, index) => (
-                                <div key={u._id} style={{
-                                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                                    padding: "10px", background: colorStyles.surface, borderRadius: "12px",
-                                    marginBottom: "8px", animation: `slideInLeft ${0.3 + index * 0.05}s ease`
-                                }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                        <img
-                                            src={u.profileImage}
-                                            alt="avatar"
-                                            style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
-                                        />
-                                        <span>{u.name}</span>
-                                    </div>
-                                    <button onClick={() => sendRequest(u._id)} style={{
-                                        padding: "6px 16px", background: colorStyles.accent,
-                                        border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer"
-                                    }}>Add</button>
-                                </div>
-                            ))
-                        )}
-                    </>
-                )}
+             {search && (
+    <>
+        <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
+        {!filteredUsers || filteredUsers.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                <span>😕 No users found</span>
+            </div>
+        ) : (
+            filteredUsers.map((u, index) => (
+                <div key={u._id} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "10px", background: colorStyles.surface, borderRadius: "12px",
+                    marginBottom: "8px"
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <img
+                            src={u.profileImage || "https://via.placeholder.com/35"}
+                            alt="avatar"
+                            style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
+                        />
+                        <span>{u.name || "User"}</span>
+                    </div>
+                    <button onClick={() => sendRequest(u._id)} style={{
+                        padding: "6px 16px", background: colorStyles.accent,
+                        border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer"
+                    }}>Add</button>
+                </div>
+            ))
+        )}
+    </>
+)}
             </div>
 
             {isMobile && <BottomNav />}
