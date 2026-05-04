@@ -6,7 +6,6 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -22,9 +21,7 @@ const app = express();
 // ========== ENVIRONMENT VARIABLES ==========
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "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";
-const CLIENT_URL = process.env.CLIENT_URL || "https://live-chat-q84d.onrender.com"; // Vite default port
-const EMAIL_USER = process.env.EMAIL_USER || "irshadmustafa659@gmail.com";
-const EMAIL_PASS = process.env.EMAIL_PASS || "zjyg ncsf ujvn jlqu";
+const CLIENT_URL = process.env.CLIENT_URL || "https://live-chat-q84d.onrender.com";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // ========== CORS CONFIGURATION ==========
@@ -89,16 +86,12 @@ const upload = multer({
 
 // ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
 if (NODE_ENV === 'production') {
-    // Path to Vite dist folder (one level up, then client-side/dist)
     const distPath = path.join(__dirname, '../client-side/dist');
     
     if (fs.existsSync(distPath)) {
-        // Serve static files from Vite build
         app.use(express.static(distPath));
         
-        // Handle React routing, return all requests to index.html
         app.get('*', (req, res) => {
-            // Skip API routes
             if (req.path.startsWith('/api') || 
                 req.path.startsWith('/uploads') ||
                 req.path === '/health' ||
@@ -139,51 +132,14 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     }
 });
 
-// ========== EMAIL CONFIGURATION ==========
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
-    },
-});
-
+// ========== OTP STORAGE ==========
 const otpStore = new Map();
 
 function generateOTP() {
-    return Math.floor(100000 + Math.random()  * 900000).toString();
+    return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-async function sendOTPEmail(email, otp, name) {
-    try {
-        const info = await transporter.sendMail({
-            from: `"TALK_ANY_TIME" <${EMAIL_USER}>`,
-            to: email,
-            subject: "Verify Your Email - OTP Code",
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Email Verification</h2>
-                    <p>Hello ${name},</p>
-                    <p>Thank you for registering! Please use the following OTP to verify your email address:</p>
-                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
-                        ${otp}
-                    </div>
-                    <p>This OTP is valid for <strong>10 minutes</strong>.</p>
-                    <p>If you didn't request this, please ignore this email.</p>
-                    <hr>
-                    <small>This is an automated message, please do not reply.</small>
-                </div>
-            `,
-            text: `Your OTP for email verification is: ${otp}\nValid for 10 minutes.`
-        });
-        return true;
-    } catch (error) {
-        console.error("Error sending OTP:", error);
-        return false;
-    }
-}
-
-// ========== REGISTER API ==========
+// ========== REGISTER API (NO EMAIL - DIRECT OTP) ==========
 app.post("/register", async (req, res) => {
     const { name, email, password, profileImage } = req.body;
 
@@ -191,13 +147,11 @@ app.post("/register", async (req, res) => {
         return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Validate email format
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!emailRegex.test(email)) {
         return res.status(400).json({ error: "Invalid email format" });
     }
 
-    // Validate password strength
     if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
@@ -222,15 +176,11 @@ app.post("/register", async (req, res) => {
             }
         });
 
-        const emailSent = await sendOTPEmail(email, otp, name);
-
-        if (!emailSent) {
-            return res.status(500).json({ error: "Failed to send OTP email" });
-        }
-
+        // ✅ SIRF OTP RETURN KARO, EMAIL NAHI
         res.status(200).json({
-            message: "OTP sent to your email. Please verify to complete registration.",
-            email: email
+            message: "✅ Registration successful! Use OTP to verify.",
+            email: email,
+            otp: otp  // OTP directly in response
         });
     } catch (error) {
         console.error("Registration error:", error);
@@ -240,7 +190,7 @@ app.post("/register", async (req, res) => {
 
 // ========== VERIFY OTP API ==========
 app.post("/verify-otp", async (req, res) => {
-    const { email, otp } = req.body;
+    const { email, otp, profileImage } = req.body;
 
     if (!email || !otp) {
         return res.status(400).json({ error: "Email and OTP are required" });
@@ -281,7 +231,7 @@ app.post("/verify-otp", async (req, res) => {
         otpStore.delete(email);
 
         res.json({
-            message: "Email verified successfully! Registration complete.",
+            message: "✅ Email verified successfully! Registration complete.",
             token,
             user: {
                 id: user._id,
@@ -319,13 +269,11 @@ app.post("/resend-otp", async (req, res) => {
         storedData.expiry = newExpiry;
         otpStore.set(email, storedData);
 
-        const emailSent = await sendOTPEmail(email, newOtp, storedData.userData.name);
-
-        if (!emailSent) {
-            return res.status(500).json({ error: "Failed to send OTP" });
-        }
-
-        res.json({ message: "New OTP sent to your email" });
+        // ✅ SIRF OTP RETURN KARO
+        res.json({ 
+            message: "New OTP generated",
+            otp: newOtp 
+        });
 
     } catch (error) {
         console.error("Resend OTP error:", error);
@@ -438,7 +386,6 @@ app.post("/request", auth, async (req, res) => {
     }
     
     try {
-        // Check if request already exists
         const existingRequest = await request.findOne({
             sender: req.userid,
             receiver: receiver,
@@ -596,7 +543,6 @@ io.on("connection", (socket) => {
                 messageId: message._id
             });
 
-            // Send confirmation back to sender
             socket.emit("message_sent", {
                 text,
                 receiver: receiverId,
@@ -632,7 +578,6 @@ app.use((err, req, res, next) => {
 // ========== 404 HANDLER ==========
 app.use((req, res) => {
     if (NODE_ENV === 'production' && !req.path.startsWith('/api')) {
-        // Try to serve index.html for client-side routing
         const distPath = path.join(__dirname, '../client-side/dist');
         if (fs.existsSync(distPath)) {
             return res.sendFile(path.join(distPath, 'index.html'));
