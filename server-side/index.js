@@ -85,13 +85,17 @@ const upload = multer({
 });
 
 // ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
+// ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
 if (NODE_ENV === 'production') {
     const distPath = path.join(__dirname, '../client-side/dist');
     
     if (fs.existsSync(distPath)) {
+        // Serve static files from Vite build
         app.use(express.static(distPath));
         
+        // Handle React routing, return all requests to index.html
         app.get('*', (req, res) => {
+            // Skip API routes
             if (req.path.startsWith('/api') || 
                 req.path.startsWith('/uploads') ||
                 req.path === '/health' ||
@@ -104,8 +108,9 @@ if (NODE_ENV === 'production') {
                 req.path === '/request' ||
                 req.path === '/request-show' ||
                 req.path === '/friends' ||
+                req.path === '/debug-user' ||
                 req.path.startsWith('/accept-request')) {
-                return next();
+                return;  // ✅ Changed from return next() to return
             }
             res.sendFile(path.join(distPath, 'index.html'));
         });
@@ -113,7 +118,6 @@ if (NODE_ENV === 'production') {
         console.warn('⚠️ Frontend build not found. Run "npm run build" in client-side folder first.');
     }
 }
-
 // ========== IMAGE UPLOAD ROUTE ==========
 app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     try {
