@@ -1,56 +1,54 @@
-// ========== IMPORTANT LIBRABIES ==========
+// ========== IMPORTANT LIBRARIES ==========
 require('dotenv').config();
-
-const express = require("express")
-const bcrypt = require("bcrypt")
-const jwt = require("jsonwebtoken")
-const cors = require("cors")
+const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
 const http = require("http");
-const { Server } = require("socket.io")
-const nodemailer = require("nodemailer")
-const multer = require("multer")
-const path = require("path")
-const fs = require("fs")
-const connectdDB = require("./data-base/db-starter")
+const { Server } = require("socket.io");
+const nodemailer = require("nodemailer");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const connectdDB = require("./data-base/db-starter");
 
-// ========== DATABASE SCHEMAS ==========
-const User = require("./data-base/user-module")
-const request = require("./data-base/db-request")
-const Msg = require("./data-base/db-msg--collector")
+// Data-base schema
+const User = require("./data-base/user-module");
+const request = require("./data-base/db-request");
+const Msg = require("./data-base/db-msg--collector");
 
-// ========== ENVIRONMENT VARIABLES (NO FALLBACKS FOR PASSWORDS) ==========
+const app = express();
+
+// ========== ENVIRONMENT VARIABLES ==========
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "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";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173"; // Vite default port
 const EMAIL_USER = process.env.EMAIL_USER || "irshadmustafa659@gmail.com";
-const EMAIL_PASS = process.env.EMAIL_PASS;  // ✅ NO FALLBACK - MUST BE SET IN RENDER
+const EMAIL_PASS = process.env.EMAIL_PASS || "zjyg ncsf ujvn jlqu";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// ========== EXPRESS APP SETUP ==========
-const app = express()
-const _dirname = path.resolve();
-
-const allowedOrigins = [
-    'https://linksy-tn3q.onrender.com',
-    'https://zento-384q.onrender.com',
-    'http://localhost:3001'
-];
-
+// ========== CORS CONFIGURATION ==========
 app.use(cors({
-    origin: function(origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: CLIENT_URL,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ limit: '10mb', extended: true }))
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const server = http.createServer(app);
+
+// ========== SOCKET.IO WITH PRODUCTION CONFIG ==========
+const io = new Server(server, {
+    cors: {
+        origin: CLIENT_URL,
+        credentials: true,
+        methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling']
+});
 
 // ========== IMAGE UPLOAD CONFIGURATION ==========
 const uploadDir = "./uploads";
@@ -58,7 +56,7 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-app.use("/uploads", express.static(path.join(_dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -89,6 +87,40 @@ const upload = multer({
     fileFilter: fileFilter,
 });
 
+// ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
+if (NODE_ENV === 'production') {
+    // Path to Vite dist folder (one level up, then client-side/dist)
+    const distPath = path.join(__dirname, '../client-side/dist');
+    
+    if (fs.existsSync(distPath)) {
+        // Serve static files from Vite build
+        app.use(express.static(distPath));
+        
+        // Handle React routing, return all requests to index.html
+        app.get('*', (req, res) => {
+            // Skip API routes
+            if (req.path.startsWith('/api') || 
+                req.path.startsWith('/uploads') ||
+                req.path === '/health' ||
+                req.path === '/login' ||
+                req.path === '/register' ||
+                req.path === '/verify-otp' ||
+                req.path === '/resend-otp' ||
+                req.path === '/users' ||
+                req.path === '/fetchmsg' ||
+                req.path === '/request' ||
+                req.path === '/request-show' ||
+                req.path === '/friends' ||
+                req.path.startsWith('/accept-request')) {
+                return next();
+            }
+            res.sendFile(path.join(distPath, 'index.html'));
+        });
+    } else {
+        console.warn('⚠️ Frontend build not found. Run "npm run build" in client-side folder first.');
+    }
+}
+
 // ========== IMAGE UPLOAD ROUTE ==========
 app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     try {
@@ -102,37 +134,30 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
             imageUrl: imageUrl
         });
     } catch (error) {
+        console.error("Upload error:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ========== EMAIL CONFIGURATION (FIXED - NO DUPLICATE) ==========
+// ========== EMAIL CONFIGURATION ==========
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: { 
-        user: EMAIL_USER, 
-        pass: EMAIL_PASS
+    service: "gmail",
+    auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
     },
-    tls: {
-        rejectUnauthorized: false
-    },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
 });
 
 const otpStore = new Map();
 
 function generateOTP() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(100000 + Math.random()  * 900000).toString();
 }
 
 async function sendOTPEmail(email, otp, name) {
     try {
-        await transporter.sendMail({
-            from: `"Your TALK_ANY_TIME" <${EMAIL_USER}>`,
+        const info = await transporter.sendMail({
+            from: `"TALK_ANY_TIME" <${EMAIL_USER}>`,
             to: email,
             subject: "Verify Your Email - OTP Code",
             html: `
@@ -164,6 +189,17 @@ app.post("/register", async (req, res) => {
 
     if (!name || !email || !password) {
         return res.status(400).json({ error: "All fields are required" });
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
     try {
@@ -299,112 +335,212 @@ app.post("/resend-otp", async (req, res) => {
 
 // ========== LOGIN API ==========
 app.post("/login", async (req, res) => {
-    const { email, password } = req.body
-    const verify = await User.findOne({ email })
-    if (!verify) return res.status(401).json({ error: "Email is wrong" })
-    const ismatch = await bcrypt.compare(password, verify.password)
-    if (!ismatch) return res.status(401).json({ error: "Password is wrong" })
-    const token = jwt.sign(
-        { _id: verify._id },
-        JWT_SECRET,
-        { expiresIn: "7d" }
-    )
+    const { email, password } = req.body;
 
-    res.json({ token, name: verify.name, profileImage: verify.profileImage })
-})
+    if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    try {
+        const verify = await User.findOne({ email });
+        if (!verify) return res.status(401).json({ error: "Email is wrong" });
+        
+        const ismatch = await bcrypt.compare(password, verify.password);
+        if (!ismatch) return res.status(401).json({ error: "Password is wrong" });
+        
+        const token = jwt.sign(
+            { _id: verify._id, email: verify.email },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.json({ 
+            token, 
+            name: verify.name, 
+            profileImage: verify.profileImage,
+            id: verify._id
+        });
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ error: "Login failed" });
+    }
+});
 
 // ========== AUTH MIDDLEWARE ==========
 const auth = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).send("No token");
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    
     const token = authHeader.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Invalid token format" });
+    
     try {
         const decode = jwt.verify(token, JWT_SECRET);
         req.userid = decode._id;
         next();
     } catch (err) {
-        return res.status(401).send("Invalid token");
+        return res.status(401).json({ error: "Invalid or expired token" });
     }
 };
 
-// ========== FETCH USERS ==========
-app.post("/users", async (req, res) => {
-    const alluser = await User.find({}, "_id name profileImage")
-    res.send(alluser)
-})
+// ========== FETCH ALL USERS ==========
+app.get("/users", auth, async (req, res) => {
+    try {
+        const alluser = await User.find({ _id: { $ne: req.userid } }, "_id name profileImage");
+        res.json(alluser);
+    } catch (error) {
+        console.error("Fetch users error:", error);
+        res.status(500).json({ error: "Failed to fetch users" });
+    }
+});
 
 // ========== FETCH MESSAGES ==========
 app.post("/fetchmsg", auth, async (req, res) => {
-    const sender = req.userid
-    const { receiver } = req.body
-    const msg = await Msg.find({
-        $or: [
-            { sender, receiver },
-            { sender: receiver, receiver: sender }
-        ]
-    }).sort({ createAt: 1 })
-    const formattedMessages = msg.map(message => ({
-        text: message.text,
-        sender: message.sender,
-        receiver: message.receiver,
-        isOwn: message.sender.toString() === sender.toString()
-    }))
+    const sender = req.userid;
+    const { receiver } = req.body;
+    
+    if (!receiver) {
+        return res.status(400).json({ error: "Receiver ID required" });
+    }
+    
+    try {
+        const msg = await Msg.find({
+            $or: [
+                { sender, receiver },
+                { sender: receiver, receiver: sender }
+            ]
+        }).sort({ createdAt: 1 });
+        
+        const formattedMessages = msg.map(message => ({
+            text: message.text,
+            sender: message.sender,
+            receiver: message.receiver,
+            isOwn: message.sender.toString() === sender.toString(),
+            timestamp: message.createdAt
+        }));
 
-    res.json({
-        msg: formattedMessages,
-        currentuser: req.userid
-    })
-})
+        res.json({
+            msg: formattedMessages,
+            currentuser: req.userid
+        });
+    } catch (error) {
+        console.error("Fetch messages error:", error);
+        res.status(500).json({ error: "Failed to fetch messages" });
+    }
+});
 
-// ========== FRIEND REQUEST ==========
+// ========== SEND FRIEND REQUEST ==========
 app.post("/request", auth, async (req, res) => {
     const { receiver } = req.body;
-    const newRequest = await request.create({
-        sender: req.userid,
-        receiver: receiver,
-        status: "pending"
-    });
-    res.send({ requestId: newRequest._id });
+    
+    if (!receiver) {
+        return res.status(400).json({ error: "Receiver ID required" });
+    }
+    
+    try {
+        // Check if request already exists
+        const existingRequest = await request.findOne({
+            sender: req.userid,
+            receiver: receiver,
+            status: "pending"
+        });
+        
+        if (existingRequest) {
+            return res.status(400).json({ error: "Friend request already sent" });
+        }
+        
+        const newRequest = await request.create({
+            sender: req.userid,
+            receiver: receiver,
+            status: "pending"
+        });
+        
+        res.json({ requestId: newRequest._id, message: "Friend request sent" });
+    } catch (error) {
+        console.error("Send request error:", error);
+        res.status(500).json({ error: "Failed to send friend request" });
+    }
 });
 
-// ========== SHOW REQUESTS ==========
-app.post("/request-show", auth, async (req, res) => {
-    const find_request = await request.find({
-        receiver: req.userid,
-        status: "pending"
-    }).populate("sender", "name profileImage")
-    res.send(find_request)
-})
+// ========== SHOW PENDING REQUESTS ==========
+app.get("/request-show", auth, async (req, res) => {
+    try {
+        const find_request = await request.find({
+            receiver: req.userid,
+            status: "pending"
+        }).populate("sender", "name profileImage");
+        
+        res.json(find_request);
+    } catch (error) {
+        console.error("Show requests error:", error);
+        res.status(500).json({ error: "Failed to fetch requests" });
+    }
+});
 
-// ========== ACCEPT REQUEST ==========
-app.post("/accept-request/:id", async (req, res) => {
-    const accept = await request.findByIdAndUpdate(
-        req.params.id,
-        { status: "accepted" },
-        { returnDocument: "after" }
-    )
-    await User.findByIdAndUpdate(
-        accept.sender,
-        { $addToSet: { friend: accept.receiver } }
-    )
-    await User.findByIdAndUpdate(
-        accept.receiver,
-        { $addToSet: { friend: accept.sender } }
-    )
-    res.send(accept)
-})
+// ========== ACCEPT FRIEND REQUEST ==========
+app.post("/accept-request/:id", auth, async (req, res) => {
+    try {
+        const accept = await request.findByIdAndUpdate(
+            req.params.id,
+            { status: "accepted" },
+            { new: true }
+        );
+        
+        if (!accept) {
+            return res.status(404).json({ error: "Request not found" });
+        }
+        
+        await User.findByIdAndUpdate(
+            accept.sender,
+            { $addToSet: { friend: accept.receiver } }
+        );
+        await User.findByIdAndUpdate(
+            accept.receiver,
+            { $addToSet: { friend: accept.sender } }
+        );
+        
+        res.json(accept);
+    } catch (error) {
+        console.error("Accept request error:", error);
+        res.status(500).json({ error: "Failed to accept request" });
+    }
+});
 
-// ========== GET FRIENDS ==========
+// ========== GET FRIENDS LIST ==========
 app.get("/friends", auth, async (req, res) => {
-    const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
-    res.json(user.friend);
+    try {
+        const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
+        res.json(user.friend);
+    } catch (error) {
+        console.error("Fetch friends error:", error);
+        res.status(500).json({ error: "Failed to fetch friends" });
+    }
 });
 
-// ========== SOCKET.IO CONFIGURATION ==========
-const io = new Server(server, {
-    cors: { origin: "*" }
+// ========== HEALTH CHECK ENDPOINT ==========
+app.get("/health", (req, res) => {
+    res.json({ 
+        status: "OK", 
+        timestamp: new Date(),
+        environment: NODE_ENV 
+    });
 });
 
+// ========== API ROOT ENDPOINT ==========
+app.get("/api", (req, res) => {
+    res.json({
+        name: "Chat App API",
+        version: "1.0.0",
+        endpoints: {
+            auth: "/login, /register, /verify-otp",
+            users: "/users, /friends",
+            messages: "/fetchmsg",
+            requests: "/request, /request-show, /accept-request/:id"
+        }
+    });
+});
+
+// ========== SOCKET.IO AUTHENTICATION ==========
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
@@ -419,9 +555,11 @@ io.use((socket, next) => {
 
 const activeChat = {};
 
+// ========== SOCKET.IO CONNECTION HANDLER ==========
 io.on("connection", (socket) => {
     const userId = socket.userid?.toString();
     socket.join(userId);
+    console.log(`User connected: ${userId}`);
 
     socket.on("joinChat", (receiverID) => {
         const receiverIdStr = receiverID.toString();
@@ -432,13 +570,12 @@ io.on("connection", (socket) => {
     socket.on("pass_indicator", ({ id, text }) => {
         try {
             if (id) {
-                io.to(id).emit("typing_indicator", { text: "typing" })
+                io.to(id).emit("typing_indicator", { text: "typing" });
             }
+        } catch (err) {
+            console.log("Typing indicator error:", err);
         }
-        catch (err) {
-            console.log(err)
-        }
-    })
+    });
 
     socket.on("send_message", async ({ text, id }) => {
         try {
@@ -446,7 +583,7 @@ io.on("connection", (socket) => {
             const senderId = userId;
             const receiverId = id.toString();
 
-            await Msg.create({
+            const message = await Msg.create({
                 sender: senderId,
                 receiver: receiverId,
                 text
@@ -455,15 +592,25 @@ io.on("connection", (socket) => {
             io.to(receiverId).emit("receive_message", {
                 text,
                 sender: senderId,
-                timestamp: new Date()
+                timestamp: message.createdAt,
+                messageId: message._id
+            });
+
+            // Send confirmation back to sender
+            socket.emit("message_sent", {
+                text,
+                receiver: receiverId,
+                timestamp: message.createdAt
             });
 
         } catch (err) {
             console.error("Message error:", err);
+            socket.emit("message_error", { error: "Failed to send message" });
         }
     });
 
     socket.on("disconnect", () => {
+        console.log(`User disconnected: ${userId}`);
         delete activeChat[userId];
         for (let key in activeChat) {
             if (activeChat[key] === userId) {
@@ -473,25 +620,64 @@ io.on("connection", (socket) => {
     });
 });
 
-// ========== STATIC FILES SERVING ==========
-app.use(express.static(path.join(_dirname, "client-side", "dist")));
-
-// ========== SPA CATCH-ALL ROUTE ==========
-app.get('*', (req, res) => {
-    res.sendFile(path.join(_dirname, "client-side", "dist", "index.html"));
+// ========== ERROR HANDLING MIDDLEWARE ==========
+app.use((err, req, res, next) => {
+    console.error("Error:", err.stack);
+    res.status(500).json({ 
+        error: "Something went wrong!",
+        message: NODE_ENV === 'development' ? err.message : undefined
+    });
 });
 
-// ========== SERVER START ==========
+// ========== 404 HANDLER ==========
+app.use((req, res) => {
+    if (NODE_ENV === 'production' && !req.path.startsWith('/api')) {
+        // Try to serve index.html for client-side routing
+        const distPath = path.join(__dirname, '../client-side/dist');
+        if (fs.existsSync(distPath)) {
+            return res.sendFile(path.join(distPath, 'index.html'));
+        }
+    }
+    res.status(404).json({ error: "Route not found" });
+});
+
+// ========== DATABASE CONNECTION & SERVER START ==========
 connectdDB()
     .then(() => {
         server.listen(PORT, () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
             console.log(`📁 Socket.IO ready`);
             console.log(`✅ Database connected`);
-            console.log(`🔧 Environment: ${NODE_ENV}`);
+            console.log(`🌍 Environment: ${NODE_ENV}`);
+            console.log(`🔗 Client URL: ${CLIENT_URL}`);
+            if (NODE_ENV === 'production') {
+                const distPath = path.join(__dirname, '../client-side/dist');
+                if (fs.existsSync(distPath)) {
+                    console.log(`🎨 Serving frontend from: ${distPath}`);
+                } else {
+                    console.log(`⚠️ Frontend build not found. Run "npm run build" in client-side folder.`);
+                }
+            }
         });
     })
     .catch(err => {
         console.error("❌ Database connection failed:", err);
         process.exit(1);
     });
+
+// ========== GRACEFUL SHUTDOWN ==========
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, closing server...');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received, closing server...');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});

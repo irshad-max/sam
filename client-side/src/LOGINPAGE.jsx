@@ -133,12 +133,10 @@ function Auth({ show, setToken }) {
         showRoboticPopup("❌ UNEXPECTED RESPONSE FROM SERVER ❌", "error");
       }
     } catch (err) {
-      console.log("=========================================");
       console.log("[REGISTER] ❌ ERROR OCCURRED ❌");
       console.log(`[REGISTER] Error message: ${err.message}`);
       console.log(`[REGISTER] Response status: ${err.response?.status || 'No response'}`);
       console.log(`[REGISTER] Response data:`, err.response?.data || 'No data');
-      console.log("=========================================");
 
       const errorMessage = err.response?.data?.error || err.message || "❌ REGISTRATION PROTOCOL FAILED ❌";
       showRoboticPopup(errorMessage, "error")
@@ -146,7 +144,6 @@ function Auth({ show, setToken }) {
   }
 
   const handleVerifyOTP = async () => {
-    console.log("=========================================");
     console.log("[VERIFY] Starting OTP verification");
     console.log(`[VERIFY] Email: ${tempEmail}`);
     console.log(`[VERIFY] OTP: ${otp}`);
