@@ -22,13 +22,20 @@ function LOGINPAGE({ show, setToken }) {
   const [tempName, setTempName] = useState('')
   const [tempPassword, setTempPassword] = useState('')
   const [tempImage, setTempImage] = useState(null)
+  const [lastOtp, setLastOtp] = useState('') // Last OTP store karne ke liye
 
   const [popup, setPopup] = useState({ show: false, message: '', type: '' })
 
   const showRoboticPopup = (message, type = 'info') => {
     console.log(`[POPUP] ${type}: ${message}`);
     setPopup({ show: true, message, type })
-    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 5000);
+    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 8000); // 8 seconds for OTP display
+  }
+
+  // ✅ OTP copy karne ka function
+  const copyOTPToClipboard = (otpCode) => {
+    navigator.clipboard.writeText(otpCode)
+    showRoboticPopup(`📋 OTP COPIED: ${otpCode} 📋\n\nPaste it in verification field!`, "success")
   }
 
   useEffect(() => {
@@ -112,12 +119,23 @@ function LOGINPAGE({ show, setToken }) {
 
       if (res.data.otp) {
         console.log("[REGISTER] ✅ OTP received from server:", res.data.otp);
+        setLastOtp(res.data.otp);
         
-        // ✅ MAST POPUP MEIN OTP DIKHAO
-        showRoboticPopup(
-          `🔐 YOUR OTP CODE: ${res.data.otp} 🔐\n\n📱 USE THIS CODE TO VERIFY YOUR ACCOUNT\n\n⚠️ CODE EXPIRES IN 10 MINUTES ⚠️`,
-          "success"
-        );
+        // ✅ MAST POPUP MEIN OTP DIKHAO - COPY BUTTON KE SATH
+        // Custom HTML-like message with emojis
+        const popupMessage = `╔══════════════════════════════════╗
+║      🔐 VERIFICATION CODE 🔐      ║
+╠══════════════════════════════════╣
+║                                  ║
+║      📱 ${res.data.otp} 📱       ║
+║                                  ║
+╠══════════════════════════════════╣
+║  👆 TAP ON OTP ABOVE TO COPY 👆   ║
+╠══════════════════════════════════╣
+║  ⏰ Expires in 10 minutes ⏰      ║
+╚══════════════════════════════════╝`;
+        
+        showRoboticPopup(popupMessage, "success");
         
         setTempName(name)
         setTempEmail(email)
@@ -125,7 +143,7 @@ function LOGINPAGE({ show, setToken }) {
         setTempImage(imageBase64)
         
         // 2 seconds baad OTP screen dikhao
-        setTimeout(() => setShowOTP(true), 2000);
+        setTimeout(() => setShowOTP(true), 2500);
       } else {
         showRoboticPopup("❌ UNEXPECTED RESPONSE FROM SERVER ❌", "error");
       }
@@ -156,9 +174,10 @@ function LOGINPAGE({ show, setToken }) {
         setEmail('')
         setPassword('')
         setOtp('')
+        setLastOtp('')
         setProfileImage(null)
         setImagePreview(null)
-        showRoboticPopup("✅ ACCESS GRANTED! USER REGISTERED ✅", "success")
+        showRoboticPopup("✅ ACCESS GRANTED! USER REGISTERED SUCCESSFULLY ✅", "success")
       } else {
         showRoboticPopup("❌ VERIFICATION FAILED - NO TOKEN ❌", "error");
       }
@@ -179,10 +198,21 @@ function LOGINPAGE({ show, setToken }) {
 
       if (res.data.otp) {
         console.log("[RESEND] ✅ New OTP:", res.data.otp);
-        showRoboticPopup(
-          `🔄 NEW OTP CODE: ${res.data.otp} 🔄\n\n📱 USE THIS CODE TO VERIFY YOUR ACCOUNT`,
-          "info"
-        );
+        setLastOtp(res.data.otp);
+        
+        const popupMessage = `╔══════════════════════════════════╗
+║      🔄 NEW VERIFICATION CODE 🔄     ║
+╠══════════════════════════════════╣
+║                                  ║
+║      📱 ${res.data.otp} 📱       ║
+║                                  ║
+╠══════════════════════════════════╣
+║  👆 TAP ON OTP ABOVE TO COPY 👆   ║
+╠══════════════════════════════════╣
+║  ⏰ Expires in 10 minutes ⏰      ║
+╚══════════════════════════════════╝`;
+        
+        showRoboticPopup(popupMessage, "info");
       } else {
         showRoboticPopup("⚠️ OTP RESEND FAILED ⚠️", "error");
       }
@@ -218,7 +248,7 @@ function LOGINPAGE({ show, setToken }) {
     }
   }
 
-  // Styles (same as before - keeping it short)
+  // Styles (same as before)
   const responsiveStyles = {
     cardPadding: window.innerWidth <= 480 ? "30px 20px" : window.innerWidth <= 768 ? "35px 25px" : "40px",
     titleSize: window.innerWidth <= 480 ? "24px" : window.innerWidth <= 768 ? "26px" : "28px",
@@ -381,12 +411,35 @@ function LOGINPAGE({ show, setToken }) {
           <div style={styles.card}>
             <h2 style={styles.title}>[ VERIFICATION ]</h2>
             <p style={styles.subtitle}>Enter OTP code to verify your account</p>
+            
+            {/* ✅ Last OTP dikhane ke liye (agar user bhool jaye) */}
+            {lastOtp && (
+              <div style={{ textAlign: "center", marginBottom: "15px", padding: "10px", background: "rgba(0,255,0,0.1)", borderRadius: "8px" }}>
+                <p style={{ fontSize: "12px", color: "#00ff00", marginBottom: "5px" }}>📋 Last OTP Sent:</p>
+                <p style={{ fontSize: "20px", fontWeight: "bold", color: "#00ff00", letterSpacing: "3px" }}>{lastOtp}</p>
+                <button 
+                  onClick={() => copyOTPToClipboard(lastOtp)}
+                  style={{ marginTop: "5px", padding: "4px 12px", background: "#00ff00", color: "#000", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "11px" }}
+                >
+                  📋 COPY OTP
+                </button>
+              </div>
+            )}
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>[ OTP CODE ]</label>
               <div style={styles.inputWrapper}>
                 <span style={styles.inputIcon}>🔐</span>
-                <input type="text" placeholder="ENTER 6-DIGIT CODE" value={otp} onChange={(e) => setOtp(e.target.value)} style={styles.input} maxLength="6" required autoFocus />
+                <input 
+                  type="text" 
+                  placeholder="ENTER 6-DIGIT CODE" 
+                  value={otp} 
+                  onChange={(e) => setOtp(e.target.value)} 
+                  style={styles.input} 
+                  maxLength="6" 
+                  required 
+                  autoFocus 
+                />
               </div>
             </div>
 
