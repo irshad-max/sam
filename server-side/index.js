@@ -92,34 +92,53 @@ const upload = multer({
     fileFilter: fileFilter,
 });
 
-// ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
-// ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
+
+// ========== SERVE FRONTEND BUILD FILES (PRODUCTION) ==========
 if (NODE_ENV === 'production') {
     const distPath = path.join(__dirname, '../client-side/dist');
     
     if (fs.existsSync(distPath)) {
-        // Serve static files from Vite build
-        app.use(express.static(distPath));
-        
-        // Handle React routing, return all requests to index.html
-        app.get('*', (req, res) => {
-            // Skip API routes
-            if (req.path.startsWith('/api') || 
-                req.path.startsWith('/uploads') ||
-                req.path === '/health' ||
-                req.path === '/login' ||
-                req.path === '/register' ||
-                req.path === '/verify-otp' ||
-                req.path === '/resend-otp' ||
-                req.path === '/users' ||
-                req.path === '/fetchmsg' ||
-                req.path === '/request' ||
-                req.path === '/request-show' ||
-                req.path === '/friends' ||
-                req.path === '/debug-user' ||
-                req.path.startsWith('/accept-request')) {
-                return;  // ✅ Changed from return next() to return
+        // ✅ Serve static files FIRST (this handles .js, .css, images, etc.)
+        app.use(express.static(distPath, {
+            setHeaders: (res, filePath) => {
+                // Force correct MIME types for JS and CSS
+                if (filePath.endsWith('.js')) {
+                    res.setHeader('Content-Type', 'application/javascript');
+                } else if (filePath.endsWith('.css')) {
+                    res.setHeader('Content-Type', 'text/css');
+                }
             }
+        }));
+        
+        // ✅ Explicitly handle asset files if static middleware fails
+        app.get('*.js', (req, res, next) => {
+            const filePath = path.join(distPath, req.path);
+            if (fs.existsSync(filePath)) {
+                res.setHeader('Content-Type', 'application/javascript');
+                return res.sendFile(filePath);
+            }
+            next();
+        });
+        
+        app.get('*.css', (req, res, next) => {
+            const filePath = path.join(distPath, req.path);
+            if (fs.existsSync(filePath)) {
+                res.setHeader('Content-Type', 'text/css');
+                return res.sendFile(filePath);
+            }
+            next();
+        });
+        
+        // ✅ Catch-all for React routing – must come AFTER static/asset handlers
+        app.get('*', (req, res, next) => {
+            // Skip API routes
+            const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', 
+                              '/resend-otp', '/users', '/fetchmsg', '/request', 
+                              '/request-show', '/friends', '/accept-request', '/upload-image'];
+            if (apiRoutes.some(route => req.path.startsWith(route))) {
+                return next();
+            }
+            // Serve index.html for any other route (for client-side routing)
             res.sendFile(path.join(distPath, 'index.html'));
         });
     } else {
