@@ -88,21 +88,41 @@ const upload = multer({
 });
 
 // ========== SERVE FRONTEND BUILD FILES ==========
-const distPath = path.join(__dirname, '../client-side/dist');
+// Try multiple possible paths
+const possiblePaths = [
+    path.join(__dirname, '../client-side/dist'),
+    path.join(__dirname, '../dist'),
+    path.join(__dirname, 'public'),
+    path.join(process.cwd(), 'client-side/dist')
+];
 
-if (fs.existsSync(distPath)) {
-    console.log(`✅ Found frontend build at: ${distPath}`);
+let distPath = null;
+for (const testPath of possiblePaths) {
+    if (fs.existsSync(testPath)) {
+        distPath = testPath;
+        console.log(`✅ Found frontend build at: ${distPath}`);
+        break;
+    }
+}
+
+if (distPath) {
+    // Serve static files
+    app.use(express.static(distPath));
     
-    // Serve static files with correct MIME types
-    app.use(express.static(distPath, {
-        setHeaders: (res, filePath) => {
-            if (filePath.endsWith('.js')) {
+    // Special handling for JS and CSS files
+    app.get(/\.(js|css)$/, (req, res, next) => {
+        const filePath = path.join(distPath, req.path);
+        if (fs.existsSync(filePath)) {
+            if (req.path.endsWith('.js')) {
                 res.setHeader('Content-Type', 'application/javascript');
-            } else if (filePath.endsWith('.css')) {
+            } else if (req.path.endsWith('.css')) {
                 res.setHeader('Content-Type', 'text/css');
             }
+            res.sendFile(filePath);
+        } else {
+            next();
         }
-    }));
+    });
     
     // For all other routes (client-side routing), serve index.html
     app.get('*', (req, res, next) => {
@@ -115,35 +135,28 @@ if (fs.existsSync(distPath)) {
             return next();
         }
         
-        // Don't serve index.html for asset files
+        // Don't serve index.html for asset files that don't exist
         if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webp)$/)) {
-            return res.status(404).send('Not found');
+            return res.status(404).json({ error: 'Asset not found' });
         }
         
         // Serve index.html for client-side routing
-        res.sendFile(path.join(distPath, 'index.html'));
+        const indexPath = path.join(distPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        } else {
+            res.status(404).json({ error: 'Frontend not found' });
+        }
     });
 } else {
-    console.warn(`⚠️ Frontend build not found at: ${distPath}`);
-}
-// ========== IMAGE UPLOAD ROUTE ==========
-app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded" });
-        }
-
-        const imageUrl = `/uploads/${req.file.filename}`;
-        res.json({
-            success: true,
-            imageUrl: imageUrl
+    console.error('❌ No frontend build found!');
+    app.get('*', (req, res) => {
+        res.status(404).json({ 
+            error: 'Frontend not found. Please build the frontend first.',
+            path: req.path
         });
-    } catch (error) {
-        console.error("Upload error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
+    });
+}
 // ========== EMAIL CONFIGURATION ==========
 const transporter = nodemailer.createTransport({
     service: "gmail",
