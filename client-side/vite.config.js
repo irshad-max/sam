@@ -23,8 +23,25 @@ export default defineConfig({
       }
     }
   ],
+  base: '/',  // CRITICAL: This ensures correct asset paths
   build: {
     outDir: 'dist',
-    sourcemap: false
+    assetsDir: 'assets',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    }
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:3001',
+      '/socket.io': 'http://localhost:3001'
+    }
   }
 })
