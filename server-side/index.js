@@ -457,13 +457,20 @@ app.post("/accept-request/:id", auth, async (req, res) => {
 app.get("/friends", auth, async (req, res) => {
     try {
         const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
-        res.json(user.friend);
+        
+        // ✅ Check karo ki user.friend exist karta hai ya nahi
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // ✅ Agar friend array null ya undefined hai toh empty array return karo
+        const friends = user.friend || [];
+        res.json(friends);
     } catch (error) {
         console.error("Fetch friends error:", error);
-        res.status(500).json({ error: "Failed to fetch friends" });
+        res.status(500).json({ error: "Failed to fetch friends", details: error.message });
     }
 });
-
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get("/health", (req, res) => {
     res.json({ 
