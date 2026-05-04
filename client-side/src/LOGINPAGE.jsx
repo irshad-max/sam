@@ -5,7 +5,7 @@ import RoboticPopup from './RoboticPopup'
 // ✅ PRODUCTION URL - DIRECT
 const API_URL = "https://live-chat-q84d.onrender.com";
 
-function Auth({ show, setToken }) {
+function LOGINPAGE({ show, setToken }) {
   const [isLogin, setIsLogin] = useState(true)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -28,7 +28,7 @@ function Auth({ show, setToken }) {
   const showRoboticPopup = (message, type = 'info') => {
     console.log(`[POPUP] ${type}: ${message}`);
     setPopup({ show: true, message, type })
-    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 3000);
+    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 5000);
   }
 
   useEffect(() => {
@@ -94,10 +94,7 @@ function Auth({ show, setToken }) {
     console.log("[REGISTER] Starting registration process");
     console.log(`[REGISTER] Name: ${name}`);
     console.log(`[REGISTER] Email: ${email}`);
-    console.log(`[REGISTER] Password length: ${password?.length || 0}`);
-    console.log(`[REGISTER] Has image: ${!!image}`);
     console.log(`[REGISTER] API_URL: ${API_URL}`);
-    console.log(`[REGISTER] Full URL: ${API_URL}/register`);
 
     try {
       let imageBase64 = null
@@ -106,61 +103,51 @@ function Auth({ show, setToken }) {
         imageBase64 = await imageToBase64(image)
       }
 
-      const requestData = {
-        name,
-        email,
-        password,
-        profileImage: imageBase64
-      };
-      console.log("[REGISTER] Request data prepared");
+      const requestData = { name, email, password, profileImage: imageBase64 };
       console.log("[REGISTER] Sending POST request...");
 
       const res = await axios.post(`${API_URL}/register`, requestData);
 
-      console.log("[REGISTER] Response received:", res.status, res.statusText);
-      console.log("[REGISTER] Response data:", res.data);
+      console.log("[REGISTER] Response:", res.data);
 
-      if (res.data.message) {
-        console.log("[REGISTER] Registration successful, OTP sent");
+      if (res.data.otp) {
+        console.log("[REGISTER] ✅ OTP received from server:", res.data.otp);
+        
+        // ✅ MAST POPUP MEIN OTP DIKHAO
+        showRoboticPopup(
+          `🔐 YOUR OTP CODE: ${res.data.otp} 🔐\n\n📱 USE THIS CODE TO VERIFY YOUR ACCOUNT\n\n⚠️ CODE EXPIRES IN 10 MINUTES ⚠️`,
+          "success"
+        );
+        
         setTempName(name)
         setTempEmail(email)
         setTempPassword(password)
         setTempImage(imageBase64)
-        setShowOTP(true)
-        showRoboticPopup("⚡ OTP TRANSMITTED TO TARGET EMAIL ⚡", "success")
+        
+        // 2 seconds baad OTP screen dikhao
+        setTimeout(() => setShowOTP(true), 2000);
       } else {
-        console.log("[REGISTER] Unexpected response format:", res.data);
         showRoboticPopup("❌ UNEXPECTED RESPONSE FROM SERVER ❌", "error");
       }
     } catch (err) {
-      console.log("[REGISTER] ❌ ERROR OCCURRED ❌");
-      console.log(`[REGISTER] Error message: ${err.message}`);
-      console.log(`[REGISTER] Response status: ${err.response?.status || 'No response'}`);
-      console.log(`[REGISTER] Response data:`, err.response?.data || 'No data');
-
-      const errorMessage = err.response?.data?.error || err.message || "❌ REGISTRATION PROTOCOL FAILED ❌";
+      console.log("[REGISTER] ❌ ERROR:", err.message);
+      const errorMessage = err.response?.data?.error || err.message || "❌ REGISTRATION FAILED ❌";
       showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleVerifyOTP = async () => {
-    console.log("[VERIFY] Starting OTP verification");
-    console.log(`[VERIFY] Email: ${tempEmail}`);
-    console.log(`[VERIFY] OTP: ${otp}`);
+    console.log("[VERIFY] Starting OTP verification for:", tempEmail);
 
     try {
-      console.log("[VERIFY] Sending verification request...");
       const res = await axios.post(`${API_URL}/verify-otp`, {
         email: tempEmail,
         otp: otp,
         profileImage: tempImage
       })
 
-      console.log("[VERIFY] Response received:", res.status);
-      console.log("[VERIFY] Response data:", res.data);
-
       if (res.data.token) {
-        console.log("[VERIFY] ✅ Verification successful! Token received");
+        console.log("[VERIFY] ✅ Verification successful!");
         localStorage.setItem("token", res.data.token)
         setToken(res.data.token)
         setShowOTP(false)
@@ -173,16 +160,10 @@ function Auth({ show, setToken }) {
         setImagePreview(null)
         showRoboticPopup("✅ ACCESS GRANTED! USER REGISTERED ✅", "success")
       } else {
-        console.log("[VERIFY] No token in response:", res.data);
         showRoboticPopup("❌ VERIFICATION FAILED - NO TOKEN ❌", "error");
       }
     } catch (err) {
-      console.log("=========================================");
-      console.log("[VERIFY] ❌ VERIFICATION ERROR ❌");
-      console.log(`[VERIFY] Error message: ${err.message}`);
-      console.log(`[VERIFY] Response data:`, err.response?.data || 'No data');
-      console.log("=========================================");
-
+      console.log("[VERIFY] ❌ ERROR:", err.message);
       const errorMessage = err.response?.data?.error || "❌ INVALID OTP CODE ❌";
       showRoboticPopup(errorMessage, "error")
     }
@@ -196,11 +177,14 @@ function Auth({ show, setToken }) {
         email: tempEmail
       })
 
-      console.log("[RESEND] Response:", res.status, res.data);
-
-      if (res.data.message) {
-        console.log("[RESEND] ✅ New OTP sent successfully");
-        showRoboticPopup("🔄 NEW OTP CODE GENERATED & SENT 🔄", "info")
+      if (res.data.otp) {
+        console.log("[RESEND] ✅ New OTP:", res.data.otp);
+        showRoboticPopup(
+          `🔄 NEW OTP CODE: ${res.data.otp} 🔄\n\n📱 USE THIS CODE TO VERIFY YOUR ACCOUNT`,
+          "info"
+        );
+      } else {
+        showRoboticPopup("⚠️ OTP RESEND FAILED ⚠️", "error");
       }
     } catch (err) {
       console.log("[RESEND] ❌ Error:", err.message);
@@ -210,35 +194,19 @@ function Auth({ show, setToken }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log("=========================================");
-    console.log(`[FORM] Form submitted, isLogin: ${isLogin}`);
 
     if (isLogin) {
-      console.log("[LOGIN] Attempting login...");
-      console.log(`[LOGIN] Email: ${email}`);
-      console.log(`[LOGIN] Full URL: ${API_URL}/login`);
-
       try {
-        const res = await axios.post(`${API_URL}/login`, {
-          email,
-          password
-        })
-
-        console.log("[LOGIN] Response:", res.status, res.data);
+        const res = await axios.post(`${API_URL}/login`, { email, password })
 
         if (res.data.token) {
-          console.log("[LOGIN] ✅ Login successful");
           localStorage.setItem("token", res.data.token)
           setToken(res.data.token)
           show(true)
           showRoboticPopup("🔓 SYSTEM ACCESS GRANTED 🔓", "success")
         }
       } catch (err) {
-        console.log("[LOGIN] ❌ LOGIN ERROR ❌");
-        console.log(`[LOGIN] Error message: ${err.message}`);
-        console.log(`[LOGIN] Response data:`, err.response?.data || 'No data');
-
-        const errorMessage = err.response?.data?.error || "❌ LOGIN PROTOCOL FAILED ❌";
+        const errorMessage = err.response?.data?.error || "❌ LOGIN FAILED ❌";
         showRoboticPopup(errorMessage, "error")
       }
     } else {
@@ -246,11 +214,11 @@ function Auth({ show, setToken }) {
         showRoboticPopup("⚠️ ALL FIELDS REQUIRED ⚠️", "error")
         return
       }
-      console.log("[FORM] Calling handleSendOTP...");
       handleSendOTP(name, email, password, profileImage)
     }
   }
 
+  // Styles (same as before - keeping it short)
   const responsiveStyles = {
     cardPadding: window.innerWidth <= 480 ? "30px 20px" : window.innerWidth <= 768 ? "35px 25px" : "40px",
     titleSize: window.innerWidth <= 480 ? "24px" : window.innerWidth <= 768 ? "26px" : "28px",
@@ -412,7 +380,7 @@ function Auth({ show, setToken }) {
         <div style={styles.container}>
           <div style={styles.card}>
             <h2 style={styles.title}>[ VERIFICATION ]</h2>
-            <p style={styles.subtitle}>Enter OTP code sent to: <strong>{tempEmail}</strong></p>
+            <p style={styles.subtitle}>Enter OTP code to verify your account</p>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>[ OTP CODE ]</label>
@@ -501,4 +469,4 @@ function Auth({ show, setToken }) {
   )
 }
 
-export default Auth
+export default LOGINPAGE
