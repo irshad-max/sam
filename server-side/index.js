@@ -22,10 +22,11 @@ const app = express();
 // ========== ENVIRONMENT VARIABLES ==========
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "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";
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173"; // Vite default port
+const CLIENT_URL = process.env.CLIENT_URL || "https://live-chat-q84d.onrender.com";
 const EMAIL_USER = process.env.EMAIL_USER || "irshadmustafa659@gmail.com";
 const EMAIL_PASS = process.env.EMAIL_PASS || "zjyg ncsf ujvn jlqu";
 const NODE_ENV = process.env.NODE_ENV || "development";
+const TEST_MODE = true; // SET TO false FOR REAL EMAIL
 
 // ========== CORS CONFIGURATION ==========
 app.use(cors({
@@ -89,140 +90,49 @@ const upload = multer({
 
 // ========== SERVE FRONTEND BUILD FILES ==========
 const distPath = path.join(__dirname, '../client-side/dist');
-
 if (fs.existsSync(distPath)) {
     console.log(`✅ Found frontend build at: ${distPath}`);
-    
-    // List files for debugging
-    try {
-        const files = fs.readdirSync(distPath);
-        console.log('📁 Files in dist root:', files);
-        
-        const assetsPath = path.join(distPath, 'assets');
-        if (fs.existsSync(assetsPath)) {
-            const assetsFiles = fs.readdirSync(assetsPath);
-            console.log('📁 Files in assets folder:', assetsFiles);
-        }
-    } catch(err) {
-        console.log('Error listing files:', err);
-    }
-    
-    // IMPORTANT: Serve static files from dist
     app.use(express.static(distPath));
-    
-    // Specifically handle asset files with correct MIME types
-    app.use('/assets', express.static(path.join(distPath, 'assets'), {
-        setHeaders: (res, filePath) => {
-            if (filePath.endsWith('.js')) {
-                res.setHeader('Content-Type', 'application/javascript');
-            } else if (filePath.endsWith('.css')) {
-                res.setHeader('Content-Type', 'text/css');
-            }
-        }
-    }));
-    
-    // Handle direct requests to JS files
-    app.get('*.js', (req, res, next) => {
-        // Try to find the file in dist/assets
-        const fileName = path.basename(req.path);
-        const assetPath = path.join(distPath, 'assets', fileName);
-        
-        if (fs.existsSync(assetPath)) {
-            res.setHeader('Content-Type', 'application/javascript');
-            return res.sendFile(assetPath);
-        }
-        
-        // Also check in dist root
-        const rootPath = path.join(distPath, fileName);
-        if (fs.existsSync(rootPath)) {
-            res.setHeader('Content-Type', 'application/javascript');
-            return res.sendFile(rootPath);
-        }
-        
-        next();
-    });
-    
-    // Handle direct requests to CSS files
-    app.get('*.css', (req, res, next) => {
-        const fileName = path.basename(req.path);
-        const assetPath = path.join(distPath, 'assets', fileName);
-        
-        if (fs.existsSync(assetPath)) {
-            res.setHeader('Content-Type', 'text/css');
-            return res.sendFile(assetPath);
-        }
-        
-        next();
-    });
-    
-    // For all other routes (client-side routing), serve index.html
-    app.get('*', (req, res, next) => {
-        // Skip API routes
-        const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', 
-                          '/resend-otp', '/users', '/fetchmsg', '/request', 
-                          '/request-show', '/friends', '/accept-request', '/upload-image',
-                          '/debug-files'];
-        
-        if (apiRoutes.some(route => req.path.startsWith(route))) {
-            return next();
-        }
-        
-        // Skip asset files
-        if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webp)$/)) {
-            return res.status(404).json({ error: 'Asset not found: ' + req.path });
-        }
-        
-        // Serve index.html for all other routes
-        const indexPath = path.join(distPath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-            res.sendFile(indexPath);
-        } else {
-            res.status(404).send('Frontend not found. Please build the frontend.');
-        }
-    });
-    
-} else {
-    console.error(`❌ Frontend build not found at: ${distPath}`);
-    app.get('*', (req, res) => {
-        res.status(404).send('Frontend not built. Please run npm run build in client-side folder.');
-    });
 }
+
+// ========== IMAGE UPLOAD ROUTE ==========
+app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+        const imageUrl = `/uploads/${req.file.filename}`;
+        res.json({ success: true, imageUrl: imageUrl });
+    } catch (error) {
+        console.error("Upload error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ========== EMAIL CONFIGURATION ==========
 const transporter = nodemailer.createTransport({
     service: "gmail",
-    auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
-    },
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
 });
 
 const otpStore = new Map();
 
 function generateOTP() {
-    return Math.floor(100000 + Math.random()  * 900000).toString();
+    return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 async function sendOTPEmail(email, otp, name) {
+    if (TEST_MODE) {
+        console.log(`📧 TEST MODE: OTP for ${email} is ${otp}`);
+        return true;
+    }
     try {
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
             from: `"TALK_ANY_TIME" <${EMAIL_USER}>`,
             to: email,
             subject: "Verify Your Email - OTP Code",
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Email Verification</h2>
-                    <p>Hello ${name},</p>
-                    <p>Thank you for registering! Please use the following OTP to verify your email address:</p>
-                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
-                        ${otp}
-                    </div>
-                    <p>This OTP is valid for <strong>10 minutes</strong>.</p>
-                    <p>If you didn't request this, please ignore this email.</p>
-                    <hr>
-                    <small>This is an automated message, please do not reply.</small>
-                </div>
-            `,
-            text: `Your OTP for email verification is: ${otp}\nValid for 10 minutes.`
+            html: `<div><h2>Email Verification</h2><p>Hello ${name},</p><p>Your OTP is: <strong>${otp}</strong></p><p>Valid for 10 minutes.</p></div>`,
+            text: `Your OTP is: ${otp}\nValid for 10 minutes.`
         });
         return true;
     } catch (error) {
@@ -231,23 +141,12 @@ async function sendOTPEmail(email, otp, name) {
     }
 }
 
-// ========== REGISTER API ==========
+// ========== REGISTER API (TEST MODE) ==========
 app.post("/register", async (req, res) => {
     const { name, email, password, profileImage } = req.body;
-
+    
     if (!name || !email || !password) {
         return res.status(400).json({ error: "All fields are required" });
-    }
-
-    // Validate email format
-    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-    if (!emailRegex.test(email)) {
-        return res.status(400).json({ error: "Invalid email format" });
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
     try {
@@ -255,13 +154,12 @@ app.post("/register", async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ error: "Email already registered" });
         }
-
-        const otp = generateOTP();
-        const otpExpiry = Date.now() + 10 * 60 * 1000;
-
+        
+        const otp = TEST_MODE ? "123456" : generateOTP();
+        
         otpStore.set(email, {
-            otp,
-            expiry: otpExpiry,
+            otp: otp,
+            expiry: Date.now() + 10 * 60 * 1000,
             userData: {
                 name,
                 email,
@@ -269,20 +167,17 @@ app.post("/register", async (req, res) => {
                 profileImage: profileImage || null
             }
         });
-
+        
         const emailSent = await sendOTPEmail(email, otp, name);
-
-        if (!emailSent) {
-            return res.status(500).json({ error: "Failed to send OTP email" });
-        }
-
+        
         res.status(200).json({
-            message: "OTP sent to your email. Please verify to complete registration.",
-            email: email
+            message: TEST_MODE ? "TEST MODE: Use OTP 123456" : "OTP sent to your email",
+            email: email,
+            ...(TEST_MODE && { testOtp: otp })
         });
     } catch (error) {
         console.error("Registration error:", error);
-        res.status(500).json({ error: "Registration failed" });
+        res.status(500).json({ error: "Registration failed: " + error.message });
     }
 });
 
@@ -296,21 +191,24 @@ app.post("/verify-otp", async (req, res) => {
 
     try {
         const storedData = otpStore.get(email);
-
-        if (!storedData) {
-            return res.status(400).json({ error: "OTP expired or not found. Please register again." });
+        
+        // Check if OTP matches (either stored OTP or test OTP 123456)
+        const isValidOtp = (storedData && storedData.otp === otp) || (TEST_MODE && otp === "123456");
+        
+        if (!isValidOtp) {
+            return res.status(400).json({ error: "Invalid OTP" });
         }
-
-        if (Date.now() > storedData.expiry) {
+        
+        if (storedData && Date.now() > storedData.expiry) {
             otpStore.delete(email);
-            return res.status(400).json({ error: "OTP has expired. Please register again." });
+            return res.status(400).json({ error: "OTP has expired" });
         }
-
-        if (storedData.otp !== otp) {
-            return res.status(400).json({ error: "Invalid OTP. Please try again." });
+        
+        const userData = storedData?.userData;
+        if (!userData) {
+            return res.status(400).json({ error: "No registration found. Please register again." });
         }
-
-        const { userData } = storedData;
+        
         const user = await User.create({
             name: userData.name,
             email: userData.email,
@@ -320,12 +218,7 @@ app.post("/verify-otp", async (req, res) => {
             profileImage: userData.profileImage
         });
 
-        const token = jwt.sign(
-            { _id: user._id, email: user.email },
-            JWT_SECRET,
-            { expiresIn: "7d" }
-        );
-
+        const token = jwt.sign({ _id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
         otpStore.delete(email);
 
         res.json({
@@ -338,43 +231,30 @@ app.post("/verify-otp", async (req, res) => {
                 profileImage: user.profileImage
             }
         });
-
     } catch (error) {
         console.error("OTP verification error:", error);
-        res.status(500).json({ error: "Verification failed" });
+        res.status(500).json({ error: "Verification failed: " + error.message });
     }
 });
 
 // ========== RESEND OTP API ==========
 app.post("/resend-otp", async (req, res) => {
     const { email } = req.body;
-
-    if (!email) {
-        return res.status(400).json({ error: "Email is required" });
-    }
+    if (!email) return res.status(400).json({ error: "Email is required" });
 
     try {
         const storedData = otpStore.get(email);
-
         if (!storedData) {
             return res.status(400).json({ error: "No pending registration found" });
         }
 
-        const newOtp = generateOTP();
-        const newExpiry = Date.now() + 10 * 60 * 1000;
-
+        const newOtp = TEST_MODE ? "123456" : generateOTP();
         storedData.otp = newOtp;
-        storedData.expiry = newExpiry;
+        storedData.expiry = Date.now() + 10 * 60 * 1000;
         otpStore.set(email, storedData);
 
-        const emailSent = await sendOTPEmail(email, newOtp, storedData.userData.name);
-
-        if (!emailSent) {
-            return res.status(500).json({ error: "Failed to send OTP" });
-        }
-
-        res.json({ message: "New OTP sent to your email" });
-
+        await sendOTPEmail(email, newOtp, storedData.userData.name);
+        res.json({ message: "New OTP sent", ...(TEST_MODE && { testOtp: newOtp }) });
     } catch (error) {
         console.error("Resend OTP error:", error);
         res.status(500).json({ error: "Failed to resend OTP" });
@@ -384,7 +264,6 @@ app.post("/resend-otp", async (req, res) => {
 // ========== LOGIN API ==========
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
-
     if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required" });
     }
@@ -396,18 +275,9 @@ app.post("/login", async (req, res) => {
         const ismatch = await bcrypt.compare(password, verify.password);
         if (!ismatch) return res.status(401).json({ error: "Password is wrong" });
         
-        const token = jwt.sign(
-            { _id: verify._id, email: verify.email },
-            JWT_SECRET,
-            { expiresIn: "7d" }
-        );
+        const token = jwt.sign({ _id: verify._id, email: verify.email }, JWT_SECRET, { expiresIn: "7d" });
 
-        res.json({ 
-            token, 
-            name: verify.name, 
-            profileImage: verify.profileImage,
-            id: verify._id
-        });
+        res.json({ token, name: verify.name, profileImage: verify.profileImage, id: verify._id });
     } catch (error) {
         console.error("Login error:", error);
         res.status(500).json({ error: "Login failed" });
@@ -430,28 +300,6 @@ const auth = (req, res, next) => {
         return res.status(401).json({ error: "Invalid or expired token" });
     }
 };
-// Debug endpoint to verify files are being served
-app.get('/debug-files', (req, res) => {
-    const distPath = path.join(__dirname, '../client-side/dist');
-    if (fs.existsSync(distPath)) {
-        const files = fs.readdirSync(distPath);
-        const assetsPath = path.join(distPath, 'assets');
-        const assetsFiles = fs.existsSync(assetsPath) ? fs.readdirSync(assetsPath) : [];
-        const indexPath = path.join(distPath, 'index.html');
-        const indexContent = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '';
-        
-        res.json({
-            success: true,
-            distPath,
-            files,
-            assetsFiles,
-            indexHasScripts: indexContent.includes('script'),
-            nodeEnv: process.env.NODE_ENV
-        });
-    } else {
-        res.json({ success: false, distPath });
-    }
-});
 
 // ========== FETCH ALL USERS ==========
 app.get("/users", auth, async (req, res) => {
@@ -459,7 +307,6 @@ app.get("/users", auth, async (req, res) => {
         const alluser = await User.find({ _id: { $ne: req.userid } }, "_id name profileImage");
         res.json(alluser);
     } catch (error) {
-        console.error("Fetch users error:", error);
         res.status(500).json({ error: "Failed to fetch users" });
     }
 });
@@ -469,16 +316,11 @@ app.post("/fetchmsg", auth, async (req, res) => {
     const sender = req.userid;
     const { receiver } = req.body;
     
-    if (!receiver) {
-        return res.status(400).json({ error: "Receiver ID required" });
-    }
+    if (!receiver) return res.status(400).json({ error: "Receiver ID required" });
     
     try {
         const msg = await Msg.find({
-            $or: [
-                { sender, receiver },
-                { sender: receiver, receiver: sender }
-            ]
+            $or: [{ sender, receiver }, { sender: receiver, receiver: sender }]
         }).sort({ createdAt: 1 });
         
         const formattedMessages = msg.map(message => ({
@@ -489,12 +331,8 @@ app.post("/fetchmsg", auth, async (req, res) => {
             timestamp: message.createdAt
         }));
 
-        res.json({
-            msg: formattedMessages,
-            currentuser: req.userid
-        });
+        res.json({ msg: formattedMessages, currentuser: req.userid });
     } catch (error) {
-        console.error("Fetch messages error:", error);
         res.status(500).json({ error: "Failed to fetch messages" });
     }
 });
@@ -502,17 +340,11 @@ app.post("/fetchmsg", auth, async (req, res) => {
 // ========== SEND FRIEND REQUEST ==========
 app.post("/request", auth, async (req, res) => {
     const { receiver } = req.body;
-    
-    if (!receiver) {
-        return res.status(400).json({ error: "Receiver ID required" });
-    }
+    if (!receiver) return res.status(400).json({ error: "Receiver ID required" });
     
     try {
-        // Check if request already exists
         const existingRequest = await request.findOne({
-            sender: req.userid,
-            receiver: receiver,
-            status: "pending"
+            sender: req.userid, receiver: receiver, status: "pending"
         });
         
         if (existingRequest) {
@@ -520,14 +352,11 @@ app.post("/request", auth, async (req, res) => {
         }
         
         const newRequest = await request.create({
-            sender: req.userid,
-            receiver: receiver,
-            status: "pending"
+            sender: req.userid, receiver: receiver, status: "pending"
         });
         
         res.json({ requestId: newRequest._id, message: "Friend request sent" });
     } catch (error) {
-        console.error("Send request error:", error);
         res.status(500).json({ error: "Failed to send friend request" });
     }
 });
@@ -536,13 +365,10 @@ app.post("/request", auth, async (req, res) => {
 app.get("/request-show", auth, async (req, res) => {
     try {
         const find_request = await request.find({
-            receiver: req.userid,
-            status: "pending"
+            receiver: req.userid, status: "pending"
         }).populate("sender", "name profileImage");
-        
         res.json(find_request);
     } catch (error) {
-        console.error("Show requests error:", error);
         res.status(500).json({ error: "Failed to fetch requests" });
     }
 });
@@ -551,27 +377,16 @@ app.get("/request-show", auth, async (req, res) => {
 app.post("/accept-request/:id", auth, async (req, res) => {
     try {
         const accept = await request.findByIdAndUpdate(
-            req.params.id,
-            { status: "accepted" },
-            { new: true }
+            req.params.id, { status: "accepted" }, { new: true }
         );
         
-        if (!accept) {
-            return res.status(404).json({ error: "Request not found" });
-        }
+        if (!accept) return res.status(404).json({ error: "Request not found" });
         
-        await User.findByIdAndUpdate(
-            accept.sender,
-            { $addToSet: { friend: accept.receiver } }
-        );
-        await User.findByIdAndUpdate(
-            accept.receiver,
-            { $addToSet: { friend: accept.sender } }
-        );
+        await User.findByIdAndUpdate(accept.sender, { $addToSet: { friend: accept.receiver } });
+        await User.findByIdAndUpdate(accept.receiver, { $addToSet: { friend: accept.sender } });
         
         res.json(accept);
     } catch (error) {
-        console.error("Accept request error:", error);
         res.status(500).json({ error: "Failed to accept request" });
     }
 });
@@ -582,32 +397,13 @@ app.get("/friends", auth, async (req, res) => {
         const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
         res.json(user.friend);
     } catch (error) {
-        console.error("Fetch friends error:", error);
         res.status(500).json({ error: "Failed to fetch friends" });
     }
 });
 
-// ========== HEALTH CHECK ENDPOINT ==========
+// ========== HEALTH CHECK ==========
 app.get("/health", (req, res) => {
-    res.json({ 
-        status: "OK", 
-        timestamp: new Date(),
-        environment: NODE_ENV 
-    });
-});
-
-// ========== API ROOT ENDPOINT ==========
-app.get("/api", (req, res) => {
-    res.json({
-        name: "Chat App API",
-        version: "1.0.0",
-        endpoints: {
-            auth: "/login, /register, /verify-otp",
-            users: "/users, /friends",
-            messages: "/fetchmsg",
-            requests: "/request, /request-show, /accept-request/:id"
-        }
-    });
+    res.json({ status: "OK", timestamp: new Date(), environment: NODE_ENV, testMode: TEST_MODE });
 });
 
 // ========== SOCKET.IO AUTHENTICATION ==========
@@ -625,7 +421,6 @@ io.use((socket, next) => {
 
 const activeChat = {};
 
-// ========== SOCKET.IO CONNECTION HANDLER ==========
 io.on("connection", (socket) => {
     const userId = socket.userid?.toString();
     socket.join(userId);
@@ -639,9 +434,7 @@ io.on("connection", (socket) => {
 
     socket.on("pass_indicator", ({ id, text }) => {
         try {
-            if (id) {
-                io.to(id).emit("typing_indicator", { text: "typing" });
-            }
+            if (id) io.to(id).emit("typing_indicator", { text: "typing" });
         } catch (err) {
             console.log("Typing indicator error:", err);
         }
@@ -650,29 +443,11 @@ io.on("connection", (socket) => {
     socket.on("send_message", async ({ text, id }) => {
         try {
             if (!text || !id) return;
-            const senderId = userId;
-            const receiverId = id.toString();
-
-            const message = await Msg.create({
-                sender: senderId,
-                receiver: receiverId,
-                text
+            const message = await Msg.create({ sender: userId, receiver: id.toString(), text });
+            io.to(id.toString()).emit("receive_message", {
+                text, sender: userId, timestamp: message.createdAt, messageId: message._id
             });
-
-            io.to(receiverId).emit("receive_message", {
-                text,
-                sender: senderId,
-                timestamp: message.createdAt,
-                messageId: message._id
-            });
-
-            // Send confirmation back to sender
-            socket.emit("message_sent", {
-                text,
-                receiver: receiverId,
-                timestamp: message.createdAt
-            });
-
+            socket.emit("message_sent", { text, receiver: id, timestamp: message.createdAt });
         } catch (err) {
             console.error("Message error:", err);
             socket.emit("message_error", { error: "Failed to send message" });
@@ -683,71 +458,35 @@ io.on("connection", (socket) => {
         console.log(`User disconnected: ${userId}`);
         delete activeChat[userId];
         for (let key in activeChat) {
-            if (activeChat[key] === userId) {
-                delete activeChat[key];
-            }
+            if (activeChat[key] === userId) delete activeChat[key];
         }
     });
 });
 
-// ========== ERROR HANDLING MIDDLEWARE ==========
-app.use((err, req, res, next) => {
-    console.error("Error:", err.stack);
-    res.status(500).json({ 
-        error: "Something went wrong!",
-        message: NODE_ENV === 'development' ? err.message : undefined
-    });
-});
-
-// ========== 404 HANDLER ==========
-app.use((req, res) => {
-    if (NODE_ENV === 'production' && !req.path.startsWith('/api')) {
-        // Try to serve index.html for client-side routing
-        const distPath = path.join(__dirname, '../client-side/dist');
-        if (fs.existsSync(distPath)) {
-            return res.sendFile(path.join(distPath, 'index.html'));
-        }
+// ========== SERVE FRONTEND FOR CLIENT-SIDE ROUTING ==========
+app.get('*', (req, res) => {
+    const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', '/resend-otp', '/users', '/fetchmsg', '/request', '/request-show', '/friends', '/accept-request', '/upload-image'];
+    if (apiRoutes.some(route => req.path.startsWith(route))) {
+        return res.status(404).json({ error: "API endpoint not found" });
     }
-    res.status(404).json({ error: "Route not found" });
+    if (fs.existsSync(path.join(distPath, 'index.html'))) {
+        res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+        res.status(404).send('Frontend not found');
+    }
 });
 
 // ========== DATABASE CONNECTION & SERVER START ==========
 connectdDB()
     .then(() => {
         server.listen(PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`);
-            console.log(`📁 Socket.IO ready`);
-            console.log(`✅ Database connected`);
+            console.log(`🚀 Server running on port ${PORT}`);
             console.log(`🌍 Environment: ${NODE_ENV}`);
+            console.log(`🔧 Test Mode: ${TEST_MODE ? "ON (Use OTP: 123456)" : "OFF"}`);
             console.log(`🔗 Client URL: ${CLIENT_URL}`);
-            if (NODE_ENV === 'production') {
-                const distPath = path.join(__dirname, '../client-side/dist');
-                if (fs.existsSync(distPath)) {
-                    console.log(`🎨 Serving frontend from: ${distPath}`);
-                } else {
-                    console.log(`⚠️ Frontend build not found. Run "npm run build" in client-side folder.`);
-                }
-            }
         });
     })
     .catch(err => {
         console.error("❌ Database connection failed:", err);
         process.exit(1);
     });
-
-// ========== GRACEFUL SHUTDOWN ==========
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing server...');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
-
-process.on('SIGINT', () => {
-    console.log('SIGINT received, closing server...');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
