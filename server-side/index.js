@@ -88,40 +88,71 @@ const upload = multer({
 });
 
 // ========== SERVE FRONTEND BUILD FILES ==========
-// Try multiple possible paths
-const possiblePaths = [
-    path.join(__dirname, '../client-side/dist'),
-    path.join(__dirname, '../dist'),
-    path.join(__dirname, 'public'),
-    path.join(process.cwd(), 'client-side/dist')
-];
+const distPath = path.join(__dirname, '../client-side/dist');
 
-let distPath = null;
-for (const testPath of possiblePaths) {
-    if (fs.existsSync(testPath)) {
-        distPath = testPath;
-        console.log(`✅ Found frontend build at: ${distPath}`);
-        break;
+if (fs.existsSync(distPath)) {
+    console.log(`✅ Found frontend build at: ${distPath}`);
+    
+    // List files for debugging
+    try {
+        const files = fs.readdirSync(distPath);
+        console.log('📁 Files in dist root:', files);
+        
+        const assetsPath = path.join(distPath, 'assets');
+        if (fs.existsSync(assetsPath)) {
+            const assetsFiles = fs.readdirSync(assetsPath);
+            console.log('📁 Files in assets folder:', assetsFiles);
+        }
+    } catch(err) {
+        console.log('Error listing files:', err);
     }
-}
-
-if (distPath) {
-    // Serve static files
+    
+    // IMPORTANT: Serve static files from dist
     app.use(express.static(distPath));
     
-    // Special handling for JS and CSS files
-    app.get(/\.(js|css)$/, (req, res, next) => {
-        const filePath = path.join(distPath, req.path);
-        if (fs.existsSync(filePath)) {
-            if (req.path.endsWith('.js')) {
+    // Specifically handle asset files with correct MIME types
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+        setHeaders: (res, filePath) => {
+            if (filePath.endsWith('.js')) {
                 res.setHeader('Content-Type', 'application/javascript');
-            } else if (req.path.endsWith('.css')) {
+            } else if (filePath.endsWith('.css')) {
                 res.setHeader('Content-Type', 'text/css');
             }
-            res.sendFile(filePath);
-        } else {
-            next();
         }
+    }));
+    
+    // Handle direct requests to JS files
+    app.get('*.js', (req, res, next) => {
+        // Try to find the file in dist/assets
+        const fileName = path.basename(req.path);
+        const assetPath = path.join(distPath, 'assets', fileName);
+        
+        if (fs.existsSync(assetPath)) {
+            res.setHeader('Content-Type', 'application/javascript');
+            return res.sendFile(assetPath);
+        }
+        
+        // Also check in dist root
+        const rootPath = path.join(distPath, fileName);
+        if (fs.existsSync(rootPath)) {
+            res.setHeader('Content-Type', 'application/javascript');
+            return res.sendFile(rootPath);
+        }
+        
+        next();
+    });
+    
+    // Handle direct requests to CSS files
+    app.get('*.css', (req, res, next) => {
+        const fileName = path.basename(req.path);
+        const assetPath = path.join(distPath, 'assets', fileName);
+        
+        if (fs.existsSync(assetPath)) {
+            res.setHeader('Content-Type', 'text/css');
+            return res.sendFile(assetPath);
+        }
+        
+        next();
     });
     
     // For all other routes (client-side routing), serve index.html
@@ -129,32 +160,31 @@ if (distPath) {
         // Skip API routes
         const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', 
                           '/resend-otp', '/users', '/fetchmsg', '/request', 
-                          '/request-show', '/friends', '/accept-request', '/upload-image'];
+                          '/request-show', '/friends', '/accept-request', '/upload-image',
+                          '/debug-files'];
         
         if (apiRoutes.some(route => req.path.startsWith(route))) {
             return next();
         }
         
-        // Don't serve index.html for asset files that don't exist
+        // Skip asset files
         if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webp)$/)) {
-            return res.status(404).json({ error: 'Asset not found' });
+            return res.status(404).json({ error: 'Asset not found: ' + req.path });
         }
         
-        // Serve index.html for client-side routing
+        // Serve index.html for all other routes
         const indexPath = path.join(distPath, 'index.html');
         if (fs.existsSync(indexPath)) {
             res.sendFile(indexPath);
         } else {
-            res.status(404).json({ error: 'Frontend not found' });
+            res.status(404).send('Frontend not found. Please build the frontend.');
         }
     });
+    
 } else {
-    console.error('❌ No frontend build found!');
+    console.error(`❌ Frontend build not found at: ${distPath}`);
     app.get('*', (req, res) => {
-        res.status(404).json({ 
-            error: 'Frontend not found. Please build the frontend first.',
-            path: req.path
-        });
+        res.status(404).send('Frontend not built. Please run npm run build in client-side folder.');
     });
 }
 // ========== EMAIL CONFIGURATION ==========
@@ -400,6 +430,28 @@ const auth = (req, res, next) => {
         return res.status(401).json({ error: "Invalid or expired token" });
     }
 };
+// Debug endpoint to verify files are being served
+app.get('/debug-files', (req, res) => {
+    const distPath = path.join(__dirname, '../client-side/dist');
+    if (fs.existsSync(distPath)) {
+        const files = fs.readdirSync(distPath);
+        const assetsPath = path.join(distPath, 'assets');
+        const assetsFiles = fs.existsSync(assetsPath) ? fs.readdirSync(assetsPath) : [];
+        const indexPath = path.join(distPath, 'index.html');
+        const indexContent = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '';
+        
+        res.json({
+            success: true,
+            distPath,
+            files,
+            assetsFiles,
+            indexHasScripts: indexContent.includes('script'),
+            nodeEnv: process.env.NODE_ENV
+        });
+    } else {
+        res.json({ success: false, distPath });
+    }
+});
 
 // ========== FETCH ALL USERS ==========
 app.get("/users", auth, async (req, res) => {
