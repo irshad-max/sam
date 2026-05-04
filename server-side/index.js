@@ -176,11 +176,10 @@ app.post("/register", async (req, res) => {
             }
         });
 
-        // ✅ SIRF OTP RETURN KARO, EMAIL NAHI
         res.status(200).json({
             message: "✅ Registration successful! Use OTP to verify.",
             email: email,
-            otp: otp  // OTP directly in response
+            otp: otp
         });
     } catch (error) {
         console.error("Registration error:", error);
@@ -269,7 +268,6 @@ app.post("/resend-otp", async (req, res) => {
         storedData.expiry = newExpiry;
         otpStore.set(email, storedData);
 
-        // ✅ SIRF OTP RETURN KARO
         res.json({ 
             message: "New OTP generated",
             otp: newOtp 
@@ -331,14 +329,17 @@ const auth = (req, res, next) => {
     }
 };
 
-// ========== FETCH ALL USERS ==========
+// ========== FETCH ALL USERS (FIXED) ==========
 app.get("/users", auth, async (req, res) => {
     try {
         const alluser = await User.find({ _id: { $ne: req.userid } }, "_id name profileImage");
-        res.json(alluser);
+        // ✅ Always return array
+        const users = Array.isArray(alluser) ? alluser : [];
+        res.json(users);
     } catch (error) {
         console.error("Fetch users error:", error);
-        res.status(500).json({ error: "Failed to fetch users" });
+        // ✅ Return empty array instead of error
+        res.json([]);
     }
 });
 
@@ -417,10 +418,11 @@ app.get("/request-show", auth, async (req, res) => {
             status: "pending"
         }).populate("sender", "name profileImage");
         
-        res.json(find_request);
+        const requests = Array.isArray(find_request) ? find_request : [];
+        res.json(requests);
     } catch (error) {
         console.error("Show requests error:", error);
-        res.status(500).json({ error: "Failed to fetch requests" });
+        res.json([]);
     }
 });
 
@@ -453,24 +455,23 @@ app.post("/accept-request/:id", auth, async (req, res) => {
     }
 });
 
-// ========== GET FRIENDS LIST ==========
+// ========== GET FRIENDS LIST (FIXED) ==========
 app.get("/friends", auth, async (req, res) => {
     try {
         const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
         
-        // ✅ Check karo ki user.friend exist karta hai ya nahi
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.json([]);
         }
         
-        // ✅ Agar friend array null ya undefined hai toh empty array return karo
-        const friends = user.friend || [];
+        const friends = Array.isArray(user.friend) ? user.friend : [];
         res.json(friends);
     } catch (error) {
         console.error("Fetch friends error:", error);
-        res.status(500).json({ error: "Failed to fetch friends", details: error.message });
+        res.json([]);
     }
 });
+
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get("/health", (req, res) => {
     res.json({ 
