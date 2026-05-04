@@ -87,40 +87,45 @@ const upload = multer({
     fileFilter: fileFilter,
 });
 
-// ========== SERVE VITE FRONTEND BUILD FILES (PRODUCTION) ==========
-if (NODE_ENV === 'production') {
-    // Path to Vite dist folder (one level up, then client-side/dist)
-    const distPath = path.join(__dirname, '../client-side/dist');
-    
-    if (fs.existsSync(distPath)) {
-        // Serve static files from Vite build
-        app.use(express.static(distPath));
-        
-        // Handle React routing, return all requests to index.html
-        app.get('*', (req, res) => {
-            // Skip API routes
-            if (req.path.startsWith('/api') || 
-                req.path.startsWith('/uploads') ||
-                req.path === '/health' ||
-                req.path === '/login' ||
-                req.path === '/register' ||
-                req.path === '/verify-otp' ||
-                req.path === '/resend-otp' ||
-                req.path === '/users' ||
-                req.path === '/fetchmsg' ||
-                req.path === '/request' ||
-                req.path === '/request-show' ||
-                req.path === '/friends' ||
-                req.path.startsWith('/accept-request')) {
-                return next();
-            }
-            res.sendFile(path.join(distPath, 'index.html'));
-        });
-    } else {
-        console.warn('⚠️ Frontend build not found. Run "npm run build" in client-side folder first.');
-    }
-}
+// ========== SERVE FRONTEND BUILD FILES ==========
+const distPath = path.join(__dirname, '../client-side/dist');
 
+if (fs.existsSync(distPath)) {
+    console.log(`✅ Found frontend build at: ${distPath}`);
+    
+    // Serve static files with correct MIME types
+    app.use(express.static(distPath, {
+        setHeaders: (res, filePath) => {
+            if (filePath.endsWith('.js')) {
+                res.setHeader('Content-Type', 'application/javascript');
+            } else if (filePath.endsWith('.css')) {
+                res.setHeader('Content-Type', 'text/css');
+            }
+        }
+    }));
+    
+    // For all other routes (client-side routing), serve index.html
+    app.get('*', (req, res, next) => {
+        // Skip API routes
+        const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', 
+                          '/resend-otp', '/users', '/fetchmsg', '/request', 
+                          '/request-show', '/friends', '/accept-request', '/upload-image'];
+        
+        if (apiRoutes.some(route => req.path.startsWith(route))) {
+            return next();
+        }
+        
+        // Don't serve index.html for asset files
+        if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webp)$/)) {
+            return res.status(404).send('Not found');
+        }
+        
+        // Serve index.html for client-side routing
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    console.warn(`⚠️ Frontend build not found at: ${distPath}`);
+}
 // ========== IMAGE UPLOAD ROUTE ==========
 app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     try {
