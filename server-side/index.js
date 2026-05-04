@@ -94,14 +94,15 @@ const upload = multer({
 
 
 // ========== SERVE FRONTEND BUILD FILES (PRODUCTION) ==========
+// ========== SERVE FRONTEND BUILD FILES (PRODUCTION) ==========
 if (NODE_ENV === 'production') {
     const distPath = path.join(__dirname, '../client-side/dist');
     
     if (fs.existsSync(distPath)) {
-        // ✅ Serve static files FIRST (this handles .js, .css, images, etc.)
+        // ✅ 1. Serve static files FIRST - before any catch-all route.
         app.use(express.static(distPath, {
             setHeaders: (res, filePath) => {
-                // Force correct MIME types for JS and CSS
+                // ✅ This ensures your JS and CSS files have the correct MIME type.
                 if (filePath.endsWith('.js')) {
                     res.setHeader('Content-Type', 'application/javascript');
                 } else if (filePath.endsWith('.css')) {
@@ -110,7 +111,7 @@ if (NODE_ENV === 'production') {
             }
         }));
         
-        // ✅ Explicitly handle asset files if static middleware fails
+        // ✅ 2. Explicit handlers for JS and CSS as a safety net.
         app.get('*.js', (req, res, next) => {
             const filePath = path.join(distPath, req.path);
             if (fs.existsSync(filePath)) {
@@ -120,29 +121,18 @@ if (NODE_ENV === 'production') {
             next();
         });
         
-        app.get('*.css', (req, res, next) => {
-            const filePath = path.join(distPath, req.path);
-            if (fs.existsSync(filePath)) {
-                res.setHeader('Content-Type', 'text/css');
-                return res.sendFile(filePath);
-            }
-            next();
-        });
-        
-        // ✅ Catch-all for React routing – must come AFTER static/asset handlers
+        // ✅ 3. The catch-all route for client-side routing goes LAST.
         app.get('*', (req, res, next) => {
-            // Skip API routes
+            // Important: Don't apply this to your API routes.
             const apiRoutes = ['/api', '/health', '/login', '/register', '/verify-otp', 
                               '/resend-otp', '/users', '/fetchmsg', '/request', 
                               '/request-show', '/friends', '/accept-request', '/upload-image'];
             if (apiRoutes.some(route => req.path.startsWith(route))) {
                 return next();
             }
-            // Serve index.html for any other route (for client-side routing)
+            // For any other route, serve the main index.html file.
             res.sendFile(path.join(distPath, 'index.html'));
         });
-    } else {
-        console.warn('⚠️ Frontend build not found. Run "npm run build" in client-side folder first.');
     }
 }
 // ========== IMAGE UPLOAD ROUTE ==========
