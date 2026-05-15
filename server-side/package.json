@@ -2,13 +2,12 @@
   "name": "chat-app-server",
   "version": "1.0.0",
   "description": "Chat app backend",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon index.js",
-    "start": "node index.js",
-    "build": "cd ../client-side && npm install && npm run build"
-  },
+  "dev": "nodemon index.js",
+  "start": "node index.js",
+  "build": "cd ../client-side && npm install && npm run build"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/irshad-max/sam.git"
@@ -18,8 +17,8 @@
   "license": "ISC",
   "type": "commonjs",
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": "18.x",
+    "npm": "9.x"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
