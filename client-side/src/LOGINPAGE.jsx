@@ -2,253 +2,146 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import RoboticPopup from './RoboticPopup'
 
-// ✅ PRODUCTION URL - DIRECT
-const API_URL = "https://live-chat-q84d.onrender.com";
-
-function LOGINPAGE({ show, setToken }) {
+function Auth({ show, setToken }) {
   const [isLogin, setIsLogin] = useState(true)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isMobile, setIsMobile] = useState(false)
-
-  // Image upload states
   const [profileImage, setProfileImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
-
-  const [showOTP, setShowOTP] = useState(false)
-  const [otp, setOtp] = useState('')
+  const [showOTPPopup, setShowOTPPopup] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
   const [tempEmail, setTempEmail] = useState('')
   const [tempName, setTempName] = useState('')
   const [tempPassword, setTempPassword] = useState('')
   const [tempImage, setTempImage] = useState(null)
-  const [lastOtp, setLastOtp] = useState('') // Last OTP store karne ke liye
-
   const [popup, setPopup] = useState({ show: false, message: '', type: '' })
 
   const showRoboticPopup = (message, type = 'info') => {
-    console.log(`[POPUP] ${type}: ${message}`);
     setPopup({ show: true, message, type })
-    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 8000); // 8 seconds for OTP display
-  }
-
-  // ✅ OTP copy karne ka function
-  const copyOTPToClipboard = (otpCode) => {
-    navigator.clipboard.writeText(otpCode)
-    showRoboticPopup(`📋 OTP COPIED: ${otpCode} 📋\n\nPaste it in verification field!`, "success")
+    setTimeout(() => setPopup({ show: false, message: '', type: '' }), 3000)
   }
 
   useEffect(() => {
-    console.log("[AUTH] Component mounted");
-    console.log(`[AUTH] API_URL: ${API_URL}`);
-
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768)
-    }
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768)
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0]
-    console.log("[IMAGE] File selected:", file?.name);
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
         showRoboticPopup("⚠️ IMAGE SIZE MUST BE LESS THAN 2MB ⚠️", "error")
         return
       }
-
       if (!file.type.startsWith('image/')) {
         showRoboticPopup("⚠️ ONLY IMAGE FILES ARE ALLOWED ⚠️", "error")
         return
       }
-
       setProfileImage(file)
-
       const reader = new FileReader()
-      reader.onloadend = () => {
-        console.log("[IMAGE] Preview created successfully");
-        setImagePreview(reader.result)
-      }
-      reader.onerror = (error) => {
-        console.error("[IMAGE] FileReader error:", error);
-      }
+      reader.onloadend = () => setImagePreview(reader.result)
       reader.readAsDataURL(file)
     }
   }
 
-  // Convert image to base64
   const imageToBase64 = (file) => {
-    console.log("[IMAGE] Converting to base64...");
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
-      reader.onload = () => {
-        console.log("[IMAGE] Base64 conversion successful");
-        resolve(reader.result)
-      }
-      reader.onerror = error => {
-        console.error("[IMAGE] Base64 conversion error:", error);
-        reject(error)
-      }
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
     })
   }
 
-  const handleSendOTP = async (name, email, password, image) => {
-    console.log("=========================================");
-    console.log("[REGISTER] Starting registration process");
-    console.log(`[REGISTER] Name: ${name}`);
-    console.log(`[REGISTER] Email: ${email}`);
-    console.log(`[REGISTER] API_URL: ${API_URL}`);
-
+  const handleRegister = async (name, email, password, image) => {
     try {
       let imageBase64 = null
-      if (image) {
-        console.log("[REGISTER] Converting image to base64...");
-        imageBase64 = await imageToBase64(image)
-      }
-
-      const requestData = { name, email, password, profileImage: imageBase64 };
-      console.log("[REGISTER] Sending POST request...");
-
-      const res = await axios.post(`${API_URL}/register`, requestData);
-
-      console.log("[REGISTER] Response:", res.data);
-
+      if (image) imageBase64 = await imageToBase64(image)
+      const res = await axios.post('/register', {
+        name, email, password, profileImage: imageBase64
+      })
       if (res.data.otp) {
-        console.log("[REGISTER] ✅ OTP received from server:", res.data.otp);
-        setLastOtp(res.data.otp);
-        
-        // ✅ MAST POPUP MEIN OTP DIKHAO - COPY BUTTON KE SATH
-        // Custom HTML-like message with emojis
-        const popupMessage = `╔══════════════════════════════════╗
-║      🔐 VERIFICATION CODE 🔐      ║
-╠══════════════════════════════════╣
-║                                  ║
-║      📱 ${res.data.otp} 📱       ║
-║                                  ║
-╠══════════════════════════════════╣
-║  👆 TAP ON OTP ABOVE TO COPY 👆   ║
-╠══════════════════════════════════╣
-║  ⏰ Expires in 10 minutes ⏰      ║
-╚══════════════════════════════════╝`;
-        
-        showRoboticPopup(popupMessage, "success");
-        
-        setTempName(name)
         setTempEmail(email)
+        setTempName(name)
         setTempPassword(password)
         setTempImage(imageBase64)
-        
-        // 2 seconds baad OTP screen dikhao
-        setTimeout(() => setShowOTP(true), 2500);
+        setOtpCode(res.data.otp)
+        setShowOTPPopup(true)
+        showRoboticPopup(`📧 OTP generated: ${res.data.otp}`, "info")
       } else {
-        showRoboticPopup("❌ UNEXPECTED RESPONSE FROM SERVER ❌", "error");
+        showRoboticPopup("❌ OTP generation failed", "error")
       }
     } catch (err) {
-      console.log("[REGISTER] ❌ ERROR:", err.message);
-      const errorMessage = err.response?.data?.error || err.message || "❌ REGISTRATION FAILED ❌";
+      const errorMessage = err.response?.data?.error || "❌ REGISTRATION PROTOCOL FAILED ❌"
       showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleVerifyOTP = async () => {
-    console.log("[VERIFY] Starting OTP verification for:", tempEmail);
-
     try {
-      const res = await axios.post(`${API_URL}/verify-otp`, {
-        email: tempEmail,
-        otp: otp,
-        profileImage: tempImage
-      })
-
+      const res = await axios.post('/verify-otp', { email: tempEmail, otp: otpCode })
       if (res.data.token) {
-        console.log("[VERIFY] ✅ Verification successful!");
         localStorage.setItem("token", res.data.token)
         setToken(res.data.token)
-        setShowOTP(false)
+        setShowOTPPopup(false)
         show(true)
+        showRoboticPopup("✅ REGISTRATION SUCCESSFUL! ✅", "success")
         setName('')
         setEmail('')
         setPassword('')
-        setOtp('')
-        setLastOtp('')
         setProfileImage(null)
         setImagePreview(null)
-        showRoboticPopup("✅ ACCESS GRANTED! USER REGISTERED SUCCESSFULLY ✅", "success")
-      } else {
-        showRoboticPopup("❌ VERIFICATION FAILED - NO TOKEN ❌", "error");
       }
     } catch (err) {
-      console.log("[VERIFY] ❌ ERROR:", err.message);
-      const errorMessage = err.response?.data?.error || "❌ INVALID OTP CODE ❌";
+      const errorMessage = err.response?.data?.error || "❌ INVALID OTP CODE ❌"
       showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleResendOTP = async () => {
-    console.log("[RESEND] Requesting new OTP for:", tempEmail);
-
     try {
-      const res = await axios.post(`${API_URL}/resend-otp`, {
-        email: tempEmail
-      })
-
+      const res = await axios.post('/resend-otp', { email: tempEmail })
       if (res.data.otp) {
-        console.log("[RESEND] ✅ New OTP:", res.data.otp);
-        setLastOtp(res.data.otp);
-        
-        const popupMessage = `╔══════════════════════════════════╗
-║      🔄 NEW VERIFICATION CODE 🔄     ║
-╠══════════════════════════════════╣
-║                                  ║
-║      📱 ${res.data.otp} 📱       ║
-║                                  ║
-╠══════════════════════════════════╣
-║  👆 TAP ON OTP ABOVE TO COPY 👆   ║
-╠══════════════════════════════════╣
-║  ⏰ Expires in 10 minutes ⏰      ║
-╚══════════════════════════════════╝`;
-        
-        showRoboticPopup(popupMessage, "info");
-      } else {
-        showRoboticPopup("⚠️ OTP RESEND FAILED ⚠️", "error");
+        setOtpCode(res.data.otp)
+        showRoboticPopup(`🔄 NEW OTP: ${res.data.otp}`, "info")
       }
     } catch (err) {
-      console.log("[RESEND] ❌ Error:", err.message);
       showRoboticPopup("⚠️ OTP RESEND FAILED ⚠️", "error")
+    }
+  }
+
+  const handleLogin = async (email, password) => {
+    try {
+      const res = await axios.post('/login', { email, password })
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token)
+        setToken(res.data.token)
+        show(true)
+        showRoboticPopup("🔓 SYSTEM ACCESS GRANTED 🔓", "success")
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || "❌ LOGIN PROTOCOL FAILED ❌"
+      showRoboticPopup(errorMessage, "error")
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
     if (isLogin) {
-      try {
-        const res = await axios.post(`${API_URL}/login`, { email, password })
-
-        if (res.data.token) {
-          localStorage.setItem("token", res.data.token)
-          setToken(res.data.token)
-          show(true)
-          showRoboticPopup("🔓 SYSTEM ACCESS GRANTED 🔓", "success")
-        }
-      } catch (err) {
-        const errorMessage = err.response?.data?.error || "❌ LOGIN FAILED ❌";
-        showRoboticPopup(errorMessage, "error")
-      }
+      handleLogin(email, password)
     } else {
       if (!name || !email || !password) {
         showRoboticPopup("⚠️ ALL FIELDS REQUIRED ⚠️", "error")
         return
       }
-      handleSendOTP(name, email, password, profileImage)
+      handleRegister(name, email, password, profileImage)
     }
   }
 
-  // Styles (same as before)
   const responsiveStyles = {
     cardPadding: window.innerWidth <= 480 ? "30px 20px" : window.innerWidth <= 768 ? "35px 25px" : "40px",
     titleSize: window.innerWidth <= 480 ? "24px" : window.innerWidth <= 768 ? "26px" : "28px",
@@ -395,69 +288,69 @@ function LOGINPAGE({ show, setToken }) {
       transition: "color 0.3s ease",
       fontFamily: "'Courier New', monospace"
     },
-    resendButton: {
-      background: "transparent",
-      color: "#00ff00",
+    modalOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1000,
+      backdropFilter: "blur(4px)"
+    },
+    modalContent: {
+      background: "rgba(10, 10, 10, 0.98)",
+      padding: "30px",
+      borderRadius: "20px",
       border: "2px solid #00ff00",
-      marginTop: "10px"
+      width: isMobile ? "90%" : "350px",
+      boxShadow: "0 0 40px rgba(0, 255, 0, 0.4)",
+      textAlign: "center"
     }
-  }
-
-  if (showOTP) {
-    return (
-      <>
-        {popup.show && <RoboticPopup message={popup.message} type={popup.type} onClose={() => setPopup({ show: false, message: '', type: '' })} />}
-        <div style={styles.container}>
-          <div style={styles.card}>
-            <h2 style={styles.title}>[ VERIFICATION ]</h2>
-            <p style={styles.subtitle}>Enter OTP code to verify your account</p>
-            
-            {/* ✅ Last OTP dikhane ke liye (agar user bhool jaye) */}
-            {lastOtp && (
-              <div style={{ textAlign: "center", marginBottom: "15px", padding: "10px", background: "rgba(0,255,0,0.1)", borderRadius: "8px" }}>
-                <p style={{ fontSize: "12px", color: "#00ff00", marginBottom: "5px" }}>📋 Last OTP Sent:</p>
-                <p style={{ fontSize: "20px", fontWeight: "bold", color: "#00ff00", letterSpacing: "3px" }}>{lastOtp}</p>
-                <button 
-                  onClick={() => copyOTPToClipboard(lastOtp)}
-                  style={{ marginTop: "5px", padding: "4px 12px", background: "#00ff00", color: "#000", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "11px" }}
-                >
-                  📋 COPY OTP
-                </button>
-              </div>
-            )}
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>[ OTP CODE ]</label>
-              <div style={styles.inputWrapper}>
-                <span style={styles.inputIcon}>🔐</span>
-                <input 
-                  type="text" 
-                  placeholder="ENTER 6-DIGIT CODE" 
-                  value={otp} 
-                  onChange={(e) => setOtp(e.target.value)} 
-                  style={styles.input} 
-                  maxLength="6" 
-                  required 
-                  autoFocus 
-                />
-              </div>
-            </div>
-
-            <button onClick={handleVerifyOTP} style={styles.button}>[ VERIFY & REGISTER ]</button>
-            <button onClick={handleResendOTP} style={{ ...styles.button, ...styles.resendButton }}>[ RESEND OTP ]</button>
-
-            <div style={styles.footer}>
-              <p onClick={() => { setShowOTP(false); setOtp(''); }} style={styles.toggleLink}>← [ BACK ]</p>
-            </div>
-          </div>
-        </div>
-      </>
-    )
   }
 
   return (
     <>
       {popup.show && <RoboticPopup message={popup.message} type={popup.type} onClose={() => setPopup({ show: false, message: '', type: '' })} />}
+
+      {showOTPPopup && (
+        <div style={styles.modalOverlay} onClick={() => setShowOTPPopup(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ color: "#00ff00", marginBottom: "10px", fontFamily: "'Courier New', monospace" }}>[ OTP VERIFICATION ]</h2>
+            <p style={{ color: "#00aa00", marginBottom: "20px", fontSize: "14px" }}>
+              Enter OTP sent to <strong>{tempEmail}</strong>
+            </p>
+            <input
+              type="text"
+              placeholder="ENTER 6-DIGIT CODE"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              maxLength="6"
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "rgba(0,0,0,0.8)",
+                border: "1px solid #00ff00",
+                borderRadius: "12px",
+                color: "#00ff00",
+                fontSize: "18px",
+                textAlign: "center",
+                letterSpacing: "5px",
+                marginBottom: "20px",
+                fontFamily: "'Courier New', monospace"
+              }}
+              autoFocus
+            />
+            <button onClick={handleVerifyOTP} style={styles.button}>[ VERIFY ]</button>
+            <button onClick={handleResendOTP} style={{ ...styles.button, marginTop: "10px" }}>[ RESEND OTP ]</button>
+            <button onClick={() => setShowOTPPopup(false)} style={{ ...styles.button, marginTop: "10px", borderColor: "#ff4444", color: "#ff4444" }}>[ CANCEL ]</button>
+          </div>
+        </div>
+      )}
+
       <div style={styles.container}>
         <div style={styles.card}>
           <h2 style={styles.title}>{isLogin ? "[ LOGIN ]" : "[ REGISTER ]"}</h2>
@@ -522,4 +415,4 @@ function LOGINPAGE({ show, setToken }) {
   )
 }
 
-export default LOGINPAGE
+export default Auth

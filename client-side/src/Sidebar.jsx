@@ -2,9 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
-// ✅ ADD THIS - API URL DEFINITION (MISSING!)
-const API_URL = "https://live-chat-q84d.onrender.com";
-
 const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => {
     const [users, setUsers] = useState([]);
     const [search, setSearch] = useState("");
@@ -21,6 +18,11 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     const [showToast, setShowToast] = useState(false);
     const socketRef = useRef(null);
 
+    // Default avatar generator
+    const getAvatarUrl = (name) => {
+        return `https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHXDwhB6qPo7H6iSoa5TXCjhQrUeN43KDu3XwZX5KPg&s=${encodeURIComponent(name || 'User')}`;
+    };
+
     const showToastMessage = (msg, isError = false) => {
         setToastMsg(msg);
         setShowToast(true);
@@ -35,7 +37,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
 
     useEffect(() => {
         if (!token) return;
-        const socket = io(API_URL, {
+        const socket = io("", {   // empty string = same origin as the page
             auth: { token }
         });
         socketRef.current = socket;
@@ -58,54 +60,37 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     }, [token]);
 
-    // ✅ FETCH USERS - FIXED
     const fetchUsers = async () => {
-        try {
-            const res = await axios.get(`${API_URL}/users`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const usersData = Array.isArray(res.data) ? res.data : [];
-            setUsers(usersData);
-        } catch (err) {
-            console.log("Fetch users error:", err);
-            setUsers([]);
-        }
+        const res = await axios.post("/users");
+        setUsers(res.data);
     };
 
-    // ✅ FETCH REQUESTS - FIXED
     const fetchRequests = async () => {
-        try {
-            const res = await axios.get(`${API_URL}/request-show`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const requestsData = Array.isArray(res.data) ? res.data : [];
-            setRequests(requestsData);
-        } catch (err) {
-            console.log("Fetch requests error:", err);
-            setRequests([]);
-        }
+        const res = await axios.post(
+            "/request-show",
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setRequests(res.data);
     };
 
-    // ✅ FETCH FRIENDS - FIXED
     const fetchFriends = async () => {
         try {
-            const res = await axios.get(`${API_URL}/friends`, {
+            const res = await axios.get("/friends", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const friendsData = Array.isArray(res.data) ? res.data : [];
-            setFriends(friendsData);
-            showToastMessage(`✅ Friends list updated (${friendsData.length} friends)`);
+            setFriends(res.data);
+            showToastMessage(`✅ Friends list updated (${res.data.length} friends)`);
         } catch (err) {
             console.log("Fetch friends error:", err);
-            setFriends([]);
             showToastMessage("❌ Failed to fetch friends", true);
         }
     };
 
-    // ✅ SEND REQUEST - FIXED
     const sendRequest = async (receiverId) => {
         try {
-            await axios.post(`${API_URL}/request`,
+            await axios.post(
+                "/request",
                 { receiver: receiverId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -117,10 +102,10 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         }
     };
 
-    // ✅ CONFIRM REQUEST - FIXED
     const confirmRequest = async (requestId) => {
         try {
-            await axios.post(`${API_URL}/accept-request/${requestId}`,
+            await axios.post(
+                `/accept-request/${requestId}`,
                 {},
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -160,10 +145,9 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
         setUsers([]);
     };
 
-    // ✅ SAFE FILTER - FIXED
-    const filteredUsers = Array.isArray(users) && users.length > 0 ? 
-        users.filter(u => u.name && u.name.toLowerCase().includes(search.toLowerCase())) : 
-        [];
+    const filteredUsers = users.filter(
+        u => u.name.toLowerCase().includes(search.toLowerCase())
+    );
 
     const colorStyles = {
         primary: "#4f46e5",
@@ -462,11 +446,11 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                                 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                         <img
-                                            src={r.sender?.profileImage || "https://via.placeholder.com/32"}
+                                            src={r.sender.profileImage}
                                             alt="avatar"
                                             style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
                                         />
-                                        <span>{r.sender?.name || "User"}</span>
+                                        <span>{r.sender.name}</span>
                                     </div>
                                     <button onClick={() => confirmRequest(r._id)} style={{
                                         padding: "6px 16px", background: colorStyles.success,
@@ -497,10 +481,9 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                         }} onClick={() => handleSelectUser(f._id, f.name, f.profileImage)}>
                             <div className="friend-avatar" style={dynamicStyles.friendAvatar}>
                                 <img
-                                    src={f.profileImage || "https://via.placeholder.com/40"}
+                                    src={f.profileImage}
                                     alt="avatar"
                                     style={dynamicStyles.friendAvatarImage}
-                                    onError={(e) => { e.target.src = "https://via.placeholder.com/40"; }}
                                 />
                             </div>
                             <div style={{ flex: 1 }}>
@@ -517,7 +500,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                 {search && (
                     <>
                         <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
-                        {!filteredUsers || filteredUsers.length === 0 ? (
+                        {filteredUsers.length === 0 ? (
                             <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
                                 <span>😕 No users found</span>
                             </div>
@@ -526,16 +509,15 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
                                 <div key={u._id} style={{
                                     display: "flex", justifyContent: "space-between", alignItems: "center",
                                     padding: "10px", background: colorStyles.surface, borderRadius: "12px",
-                                    marginBottom: "8px"
+                                    marginBottom: "8px", animation: `slideInLeft ${0.3 + index * 0.05}s ease`
                                 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                         <img
-                                            src={u.profileImage || "https://via.placeholder.com/35"}
+                                            src={u.profileImage}
                                             alt="avatar"
                                             style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
-                                            onError={(e) => { e.target.src = "https://via.placeholder.com/35"; }}
                                         />
-                                        <span>{u.name || "User"}</span>
+                                        <span>{u.name}</span>
                                     </div>
                                     <button onClick={() => sendRequest(u._id)} style={{
                                         padding: "6px 16px", background: colorStyles.accent,

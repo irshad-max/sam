@@ -75,7 +75,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Check mobile screen
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -85,10 +84,10 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket connection
+  // Socket connection – relative URL (empty string)
   useEffect(() => {
     if (!token) return;
-    socketRef.current = io("https://live-chat-q84d.onrender.com", {
+    socketRef.current = io("", {
       auth: { token }
     });
 
@@ -141,12 +140,10 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ Function to add emoji to text
   const onSelectEmoji = (emoji) => {
     setText(prev => prev + emoji);
   };
 
-  // Send message function
   const send = () => {
     if (!text.trim() || !id) return;
 
@@ -155,14 +152,12 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     setText("");
   };
 
-  // Format time
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Get status icon
   const getStatusIcon = (msg) => {
     if (!msg.isOwn) return null;
     return msg.seen ?
@@ -170,7 +165,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
   };
 
-  // Responsive styles
   const getResponsiveStyles = () => {
     const width = window.innerWidth;
     if (width <= 480) {
@@ -345,7 +339,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   };
 
-  // If no user selected
   if (!selectedUser) {
     return (
       <div style={styles.wrapper}>
@@ -369,7 +362,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
   return (
     <div style={styles.wrapper}>
-      {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           {isMobile && (
@@ -394,7 +386,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         </div>
       </div>
 
-      {/* Chat Messages */}
       <div style={styles.chatBox}>
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", color: "#6b7280", marginTop: "40px" }}>
@@ -436,10 +427,8 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
-          {/* ✅ Emoji Button - Fixed */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             style={styles.emojiBtn}
@@ -461,7 +450,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
           </button>
         </div>
 
-        {/* ✅ Emoji Picker - Shows when button clicked */}
         {showEmojiPicker && (
           <EmojiPickerComponent
             onEmojiSelect={onSelectEmoji}

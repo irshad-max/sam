@@ -11,7 +11,8 @@ function App() {
   const [showChat, setShowChat] = useState(false)
   const [selectedUser, setSelectedUser] = useState({
     name: "",
-    id: ""
+    id: "",
+    profileImage: ""
   })
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
@@ -22,12 +23,12 @@ function App() {
   }, [])
 
   const auth = (data) => { 
-    axios.post("https://live-chat-q84d.onrender.com/register", {
+    axios.post("/register", {
       name: data.name,
       email: data.email,
       password: data.password,
     }).then(res => {
-      setToken(res.data)
+      setToken(res.data.token)
       setshow(true)
     }).catch(err => {
       console.log("Registration error:", err)
@@ -38,7 +39,7 @@ function App() {
     if (!id || !token) return;
     try {
       const res = await axios.post(
-        "https://live-chat-q84d.onrender.com/fetchmsg",
+        "/fetchmsg",
         { receiver: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -49,12 +50,12 @@ function App() {
     }
   };
 
-  // ✅ FIXED: ChatArea tab click par khulega
   const handleUserSelect = (userData) => {
     setShowChat(false)
     setSelectedUser({
       name: userData.name,
-      id: userData.id
+      id: userData.id,
+      profileImage: userData.profileImage
     });
     fetchmsg(userData.id).then(() => {
       setTimeout(() => setShowChat(true), 150)
@@ -65,7 +66,6 @@ function App() {
     setShowChat(false)
   };
 
-  // Mobile view: Show either Sidebar or Chat
   if (isMobile) {
     return (
       <>
@@ -87,6 +87,7 @@ function App() {
                   token={token} 
                   prev_msg={message} 
                   uid={selectedUser.id}
+                  Userprofile={selectedUser.profileImage}
                   onBack={handleBack}
                 />
               </div>
@@ -99,7 +100,6 @@ function App() {
     )
   }
 
-  // Desktop view: Show both side by side
   return (
     <>
       {show ? (
@@ -131,6 +131,7 @@ function App() {
               token={token} 
               prev_msg={message} 
               uid={selectedUser.id}
+              Userprofile={selectedUser.profileImage}
             />
           )}
         </div>
@@ -230,8 +231,7 @@ styleSheet.textContent = `
   
   @keyframes bubbleAnim {
     0%, 100% { transform: translateY(0); opacity: 0.3; }
-    50% { transform: translateY(-15px); opacity: 1; }
-  }
+    50% { transform: translateY(-15px);
   
   @media (max-width: 768px) {
     body {
