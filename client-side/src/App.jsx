@@ -3,6 +3,7 @@ import Auth from './LOGINPAGE';
 import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatArea from './chatarea';
+import jwtDecode from 'jwt-decode';
 
 function App() {
   const [show, setShow] = useState(false);
@@ -16,11 +17,19 @@ function App() {
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   // Check existing token on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
     if (storedToken) {
+      setToken(storedToken);
+      try {
+        const decoded = jwtDecode(storedToken);
+        setCurrentUserId(decoded._id);
+      } catch (e) {
+        console.error("Invalid token");
+      }
       validateToken(storedToken);
     } else {
       setIsCheckingToken(false);
@@ -38,11 +47,13 @@ function App() {
       } else {
         localStorage.removeItem("token");
         setShow(false);
+        setCurrentUserId(null);
       }
     } catch (error) {
       console.error("Token validation failed", error);
       localStorage.removeItem("token");
       setShow(false);
+      setCurrentUserId(null);
     } finally {
       setIsCheckingToken(false);
     }
@@ -58,6 +69,7 @@ function App() {
           setToken("");
           setShow(false);
           setShowChat(false);
+          setCurrentUserId(null);
         }
         return Promise.reject(error);
       }
@@ -79,6 +91,10 @@ function App() {
     }).then(res => {
       setToken(res.data.token);
       setShow(true);
+      try {
+        const decoded = jwtDecode(res.data.token);
+        setCurrentUserId(decoded._id);
+      } catch (e) {}
     }).catch(err => {
       console.log("Registration error:", err);
     });
@@ -125,6 +141,7 @@ function App() {
             {!showChat ? (
               <Sidebar
                 token={token}
+                currentUserId={currentUserId}
                 user_id={handleUserSelect}
                 getmsg={fetchMessages}
                 isMobile={true}
@@ -157,6 +174,7 @@ function App() {
         <div style={styles.desktopContainer}>
           <Sidebar
             token={token}
+            currentUserId={currentUserId}
             user_id={handleUserSelect}
             getmsg={fetchMessages}
             isMobile={false}
@@ -194,100 +212,25 @@ function App() {
 }
 
 const styles = {
-  mobileContainer: {
-    width: "100%",
-    height: "100vh",
-    overflow: "hidden",
-    position: "relative",
-    background: "#111827"
-  },
-  chatMobileWrapper: {
-    width: "100%",
-    height: "100%",
-    position: "relative",
-    animation: "slideInRight 0.3s ease"
-  },
-  desktopContainer: {
-    display: "flex",
-    height: "100vh",
-    overflow: "hidden"
-  },
-  welcomeContainer: {
-    flex: 1,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    position: "relative",
-    overflow: "hidden"
-  },
-  welcomeAnimation: {
-    textAlign: "center",
-    animation: "fadeInUp 0.5s ease"
-  },
-  welcomeIcon: {
-    fontSize: "80px",
-    marginBottom: "20px",
-    animation: "bounce 2s infinite"
-  },
-  welcomeBubbles: {
-    display: "flex",
-    gap: "10px",
-    justifyContent: "center",
-    marginTop: "30px"
-  },
-  bubble1: {
-    width: "10px",
-    height: "10px",
-    background: "white",
-    borderRadius: "50%",
-    animation: "bubbleAnim 1.5s ease-in-out infinite",
-    animationDelay: "0s"
-  },
-  bubble2: {
-    width: "10px",
-    height: "10px",
-    background: "white",
-    borderRadius: "50%",
-    animation: "bubbleAnim 1.5s ease-in-out infinite",
-    animationDelay: "0.3s"
-  },
-  bubble3: {
-    width: "10px",
-    height: "10px",
-    background: "white",
-    borderRadius: "50%",
-    animation: "bubbleAnim 1.5s ease-in-out infinite",
-    animationDelay: "0.6s"
-  }
+  mobileContainer: { width: "100%", height: "100vh", overflow: "hidden", position: "relative", background: "#111827" },
+  chatMobileWrapper: { width: "100%", height: "100%", position: "relative", animation: "slideInRight 0.3s ease" },
+  desktopContainer: { display: "flex", height: "100vh", overflow: "hidden" },
+  welcomeContainer: { flex: 1, display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", position: "relative", overflow: "hidden" },
+  welcomeAnimation: { textAlign: "center", animation: "fadeInUp 0.5s ease" },
+  welcomeIcon: { fontSize: "80px", marginBottom: "20px", animation: "bounce 2s infinite" },
+  welcomeBubbles: { display: "flex", gap: "10px", justifyContent: "center", marginTop: "30px" },
+  bubble1: { width: "10px", height: "10px", background: "white", borderRadius: "50%", animation: "bubbleAnim 1.5s ease-in-out infinite", animationDelay: "0s" },
+  bubble2: { width: "10px", height: "10px", background: "white", borderRadius: "50%", animation: "bubbleAnim 1.5s ease-in-out infinite", animationDelay: "0.3s" },
+  bubble3: { width: "10px", height: "10px", background: "white", borderRadius: "50%", animation: "bubbleAnim 1.5s ease-in-out infinite", animationDelay: "0.6s" }
 };
 
-// Inject global animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  @keyframes slideInRight {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
-  }
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
-  }
-  @keyframes bubbleAnim {
-    0%, 100% { transform: translateY(0); opacity: 0.3; }
-    50% { transform: translateY(-15px); opacity: 1; }
-  }
-  @media (max-width: 768px) {
-    body {
-      overflow: hidden;
-      margin: 0;
-      padding: 0;
-    }
-  }
+  @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+  @keyframes bubbleAnim { 0%,100% { transform: translateY(0); opacity: 0.3; } 50% { transform: translateY(-15px); opacity: 1; } }
+  @media (max-width: 768px) { body { overflow: hidden; margin: 0; padding: 0; } }
 `;
 document.head.appendChild(styleSheet);
 

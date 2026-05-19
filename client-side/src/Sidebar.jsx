@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
-const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => {
+const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false, currentUserId }) => {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [senderuid, setsenderuid] = useState("");
@@ -24,17 +24,14 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
   const isDragging = useRef(false);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
 
-  // Determine if mobile (for drag handle visibility)
   const isMobileDevice = isMobile || window.innerWidth <= 768;
 
-  // Update height on resize
   useEffect(() => {
     const handleResize = () => setWindowHeight(window.innerHeight);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Drag handlers (only for mobile)
   const handleTouchStart = (e) => {
     if (!isMobileDevice) return;
     dragStartY.current = e.touches[0].clientY;
@@ -54,8 +51,7 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     isDragging.current = false;
   };
 
-  const getAvatarUrl = (name) =>
-    `https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHXDwhB6qPo7H6iSoa5TXCjhQrUeN43KDu3XwZX5KPg&s=${encodeURIComponent(name || 'User')}`;
+  const getAvatarUrl = (name) => `https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHXDwhB6qPo7H6iSoa5TXCjhQrUeN43KDu3XwZX5KPg&s=${encodeURIComponent(name || 'User')}`;
 
   const showToastMessage = (msg, isError = false) => {
     setToastMsg(msg);
@@ -147,7 +143,12 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     setUsers([]);
   };
 
-  const filteredUsers = users.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()));
+  // ✅ FIXED: Exclude current user and already friends from search
+  const filteredUsers = users.filter((u) => {
+    if (currentUserId && u._id === currentUserId) return false;
+    if (friends.some(f => f._id === u._id)) return false;
+    return u.name.toLowerCase().includes(search.toLowerCase());
+  });
 
   const colorStyles = {
     primary: "#4f46e5",
@@ -270,125 +271,24 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
     friendPreview: { fontSize: "11px", color: "#9ca3af", marginTop: "2px" },
   };
 
-  const Toast = () =>
-    showToast && (
-      <div
-        style={{
-          position: "fixed",
-          bottom: "80px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "#333",
-          color: "#fff",
-          padding: "8px 16px",
-          borderRadius: "8px",
-          zIndex: 2000,
-        }}
-      >
-        {toastMsg}
-      </div>
-    );
+  const Toast = () => showToast && (
+    <div style={{ position: "fixed", bottom: "80px", left: "50%", transform: "translateX(-50%)", background: "#333", color: "#fff", padding: "8px 16px", borderRadius: "8px", zIndex: 2000 }}>
+      {toastMsg}
+    </div>
+  );
 
   const BottomNav = () => (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        display: "flex",
-        background: colorStyles.surface,
-        borderTop: "1px solid rgba(255,255,255,0.1)",
-        padding: "8px 16px",
-        paddingBottom: "env(safe-area-inset-bottom)",
-        zIndex: 100,
-      }}
-    >
-      <button
-        onClick={() => {
-          setActiveTab("chats");
-          setShowRequests(false);
-        }}
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          background: "none",
-          border: "none",
-          color: activeTab === "chats" ? colorStyles.accent : "#9ca3af",
-          cursor: "pointer",
-        }}
-      >
-        <span style={{ fontSize: "22px" }}>💬</span>
-        <span>Chats</span>
-        {count_notify > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "0px",
-              right: "25%",
-              background: colorStyles.error,
-              color: "white",
-              fontSize: "10px",
-              padding: "2px 6px",
-              borderRadius: "10px",
-            }}
-          >
-            {count_notify}
-          </span>
-        )}
+    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: colorStyles.surface, borderTop: "1px solid rgba(255,255,255,0.1)", padding: "8px 16px", paddingBottom: "env(safe-area-inset-bottom)", zIndex: 100 }}>
+      <button onClick={() => { setActiveTab("chats"); setShowRequests(false); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", color: activeTab === "chats" ? colorStyles.accent : "#9ca3af", cursor: "pointer" }}>
+        <span style={{ fontSize: "22px" }}>💬</span><span>Chats</span>
+        {count_notify > 0 && <span style={{ position: "absolute", top: "0px", right: "25%", background: colorStyles.error, color: "white", fontSize: "10px", padding: "2px 6px", borderRadius: "10px" }}>{count_notify}</span>}
       </button>
-      <button
-        onClick={() => {
-          setActiveTab("requests");
-          fetchRequests();
-        }}
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          background: "none",
-          border: "none",
-          color: activeTab === "requests" ? colorStyles.accent : "#9ca3af",
-          cursor: "pointer",
-        }}
-      >
-        <span style={{ fontSize: "22px" }}>👥</span>
-        <span>Requests</span>
-        {requests.length > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "0px",
-              right: "25%",
-              background: colorStyles.error,
-              color: "white",
-              fontSize: "10px",
-              padding: "2px 6px",
-              borderRadius: "10px",
-            }}
-          >
-            {requests.length}
-          </span>
-        )}
+      <button onClick={() => { setActiveTab("requests"); fetchRequests(); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", color: activeTab === "requests" ? colorStyles.accent : "#9ca3af", cursor: "pointer" }}>
+        <span style={{ fontSize: "22px" }}>👥</span><span>Requests</span>
+        {requests.length > 0 && <span style={{ position: "absolute", top: "0px", right: "25%", background: colorStyles.error, color: "white", fontSize: "10px", padding: "2px 6px", borderRadius: "10px" }}>{requests.length}</span>}
       </button>
-      <button
-        onClick={() => setActiveTab("search")}
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          background: "none",
-          border: "none",
-          color: activeTab === "search" ? colorStyles.accent : "#9ca3af",
-          cursor: "pointer",
-        }}
-      >
-        <span style={{ fontSize: "22px" }}>🔍</span>
-        <span>Search</span>
+      <button onClick={() => setActiveTab("search")} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", color: activeTab === "search" ? colorStyles.accent : "#9ca3af", cursor: "pointer" }}>
+        <span style={{ fontSize: "22px" }}>🔍</span><span>Search</span>
       </button>
     </div>
   );
@@ -414,102 +314,29 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
       <div style={dynamicStyles.header}>
         <h2 style={dynamicStyles.logo}>💬 ChatApp</h2>
         <div style={dynamicStyles.buttonGroup}>
-          <button onClick={fetchFriends} style={dynamicStyles.friendBtn}>
-            👥 Refresh Friends ({friends.length})
-          </button>
-          <button
-            onClick={() => {
-              setShowRequests(!showRequests);
-              fetchRequests();
-            }}
-            style={dynamicStyles.requestBtn}
-          >
-            📋 Requests
-          </button>
+          <button onClick={fetchFriends} style={dynamicStyles.friendBtn}>👥 Refresh Friends ({friends.length})</button>
+          <button onClick={() => { setShowRequests(!showRequests); fetchRequests(); }} style={dynamicStyles.requestBtn}>📋 Requests</button>
         </div>
       </div>
 
       <div style={dynamicStyles.searchWrapper}>
-        <span
-          style={{
-            position: "absolute",
-            left: "28px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: "14px",
-            color: "#9ca3af",
-          }}
-        >
-          🔍
-        </span>
-        <input
-          type="text"
-          placeholder="Search user..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onFocus={fetchUsers}
-          style={dynamicStyles.searchInput}
-        />
-        {search && (
-          <span
-            onClick={clearSearch}
-            style={{
-              position: "absolute",
-              right: "28px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              cursor: "pointer",
-              color: "#9ca3af",
-            }}
-          >
-            ✖
-          </span>
-        )}
+        <span style={{ position: "absolute", left: "28px", top: "50%", transform: "translateY(-50%)", fontSize: "14px", color: "#9ca3af" }}>🔍</span>
+        <input type="text" placeholder="Search user..." value={search} onChange={(e) => setSearch(e.target.value)} onFocus={fetchUsers} style={dynamicStyles.searchInput} />
+        {search && <span onClick={clearSearch} style={{ position: "absolute", right: "28px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#9ca3af" }}>✖</span>}
       </div>
 
       <div style={dynamicStyles.content}>
         {showRequests && (
           <div style={{ marginBottom: "20px" }}>
             <h4 style={dynamicStyles.sectionTitle}>Friend Requests ({requests.length})</h4>
-            {requests.length === 0 && (
-              <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                <span>👋 No pending requests</span>
-              </div>
-            )}
+            {requests.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>👋 No pending requests</div>}
             {requests.map((r) => (
-              <div
-                key={r._id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px",
-                  background: colorStyles.surface,
-                  borderRadius: "12px",
-                  marginBottom: "8px",
-                }}
-              >
+              <div key={r._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: colorStyles.surface, borderRadius: "12px", marginBottom: "8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <img
-                    src={r.sender.profileImage || getAvatarUrl(r.sender.name)}
-                    alt="avatar"
-                    style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
-                  />
+                  <img src={r.sender.profileImage || getAvatarUrl(r.sender.name)} alt="avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
                   <span>{r.sender.name}</span>
                 </div>
-                <button
-                  onClick={() => confirmRequest(r._id)}
-                  style={{
-                    padding: "6px 16px",
-                    background: colorStyles.success,
-                    border: "none",
-                    borderRadius: "20px",
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  Accept
-                </button>
+                <button onClick={() => confirmRequest(r._id)} style={{ padding: "6px 16px", background: colorStyles.success, border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer" }}>Accept</button>
               </div>
             ))}
           </div>
@@ -520,57 +347,19 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
           <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
             <span style={{ fontSize: "50px", display: "block", marginBottom: "10px" }}>💬</span>
             <p>No friends yet</p>
-            <button
-              onClick={fetchFriends}
-              style={{
-                marginTop: "15px",
-                padding: "8px 20px",
-                background: colorStyles.accent,
-                border: "none",
-                borderRadius: "20px",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              Refresh Friends
-            </button>
+            <button onClick={fetchFriends} style={{ marginTop: "15px", padding: "8px 20px", background: colorStyles.accent, border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer" }}>Refresh Friends</button>
           </div>
         ) : (
           friends.map((f, index) => (
-            <div
-              key={f._id}
-              className="friend-item"
-              style={{
-                ...dynamicStyles.friendItem,
-                background: animateItem === f._id ? colorStyles.primary : colorStyles.surface,
-                animation: `slideInLeft ${0.3 + index * 0.05}s ease`,
-              }}
-              onClick={() => handleSelectUser(f._id, f.name, f.profileImage)}
-            >
+            <div key={f._id} className="friend-item" style={{ ...dynamicStyles.friendItem, background: animateItem === f._id ? colorStyles.primary : colorStyles.surface, animation: `slideInLeft ${0.3 + index * 0.05}s ease` }} onClick={() => handleSelectUser(f._id, f.name, f.profileImage)}>
               <div className="friend-avatar" style={dynamicStyles.friendAvatar}>
-                <img
-                  src={f.profileImage || getAvatarUrl(f.name)}
-                  alt="avatar"
-                  style={dynamicStyles.friendAvatarImage}
-                />
+                <img src={f.profileImage || getAvatarUrl(f.name)} alt="avatar" style={dynamicStyles.friendAvatarImage} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={dynamicStyles.friendName}>{f.name}</div>
-                <div style={dynamicStyles.friendPreview}>
-                  {senderuid === String(f._id) ? new_msg || "New message" : "Tap to chat"}
-                </div>
+                <div style={dynamicStyles.friendPreview}>{senderuid === String(f._id) ? new_msg || "New message" : "Tap to chat"}</div>
               </div>
-              {senderuid === String(f._id) && new_msg && (
-                <div
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: colorStyles.accent,
-                    animation: "pulse 1s infinite",
-                  }}
-                />
-              )}
+              {senderuid === String(f._id) && new_msg && <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: colorStyles.accent, animation: "pulse 1s infinite" }} />}
             </div>
           ))
         )}
@@ -579,45 +368,15 @@ const Sidebar = ({ token, user_id, getmsg, onUserSelect, isMobile = false }) => 
           <>
             <h4 style={dynamicStyles.sectionTitle}>Search Results</h4>
             {filteredUsers.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                <span>😕 No users found</span>
-              </div>
+              <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>😕 No users found</div>
             ) : (
               filteredUsers.map((u, index) => (
-                <div
-                  key={u._id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px",
-                    background: colorStyles.surface,
-                    borderRadius: "12px",
-                    marginBottom: "8px",
-                    animation: `slideInLeft ${0.3 + index * 0.05}s ease`,
-                  }}
-                >
+                <div key={u._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: colorStyles.surface, borderRadius: "12px", marginBottom: "8px", animation: `slideInLeft ${0.3 + index * 0.05}s ease` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <img
-                      src={u.profileImage || getAvatarUrl(u.name)}
-                      alt="avatar"
-                      style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }}
-                    />
+                    <img src={u.profileImage || getAvatarUrl(u.name)} alt="avatar" style={{ width: "35px", height: "35px", borderRadius: "50%", objectFit: "cover" }} />
                     <span>{u.name}</span>
                   </div>
-                  <button
-                    onClick={() => sendRequest(u._id)}
-                    style={{
-                      padding: "6px 16px",
-                      background: colorStyles.accent,
-                      border: "none",
-                      borderRadius: "20px",
-                      color: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Add
-                  </button>
+                  <button onClick={() => sendRequest(u._id)} style={{ padding: "6px 16px", background: colorStyles.accent, border: "none", borderRadius: "20px", color: "#fff", cursor: "pointer" }}>Add</button>
                 </div>
               ))
             )}
