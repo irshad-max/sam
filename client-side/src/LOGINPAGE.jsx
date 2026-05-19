@@ -33,8 +33,8 @@ function Auth({ show, setToken }) {
   const handleImageChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showRoboticPopup("⚠️ IMAGE SIZE MUST BE LESS THAN 2MB ⚠️", "error")
+      if (file.size > 7 * 1024 * 1024) {
+        showRoboticPopup("⚠️ IMAGE SIZE MUST BE LESS THAN 7MB ⚠️", "error")
         return
       }
       if (!file.type.startsWith('image/')) {

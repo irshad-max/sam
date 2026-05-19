@@ -1,4 +1,3 @@
-// ========== IMPORTANT LIBRARIES ==========
 require('dotenv').config();
 const express = require("express");
 const bcrypt = require("bcrypt");
@@ -11,38 +10,28 @@ const path = require("path");
 const fs = require("fs");
 const connectDB = require("./data-base/db-starter");
 
-// Database schema
 const User = require("./data-base/user-module");
 const Request = require("./data-base/db-request");
 const Msg = require("./data-base/db-msg--collector");
 
 const app = express();
 
-// ========== CORS ==========
+// CORS
 const allowedOrigins = process.env.FRONTEND_URL 
     ? [process.env.FRONTEND_URL] 
-    : ["http://localhost:5173", "http://localhost:3000"];  // include Vite port
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-}));
-
+    : ["http://localhost:5173", "http://localhost:3000"];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 const server = http.createServer(app);
 
-// ========== JWT SECRET ==========
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-    console.error("FATAL ERROR: JWT_SECRET is not defined.");
-    process.exit(1);
-}
+if (!JWT_SECRET) { console.error("FATAL: JWT_SECRET missing"); process.exit(1); }
 
 // ========== IMAGE UPLOAD ==========
 const uploadDir = "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, "uploads/"),
     filename: (req, file, cb) => {
@@ -57,8 +46,7 @@ const fileFilter = (req, file, cb) => {
     if (mimetype && extname) return cb(null, true);
     cb(new Error("Only image files are allowed"));
 };
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
-
+const upload = multer({ storage, limits: { fileSize: 7 * 1024 * 1024 }, fileFilter });
 app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -70,292 +58,199 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 
 // ========== OTP STORAGE (temporary) ==========
 const otpStore = new Map();
-function generateOTP() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
+function generateOTP() { return Math.floor(100000 + Math.random() * 900000).toString(); }
 
-// ========== REGISTER ==========
 app.post("/register", async (req, res) => {
     const { name, email, password, profileImage } = req.body;
-    if (!name || !email || !password) {
-        return res.status(400).json({ error: "All fields are required" });
-    }
-
+    if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
     try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ error: "Email already registered" });
-        }
-
+        if (await User.findOne({ email })) return res.status(400).json({ error: "Email already registered" });
         const otp = generateOTP();
-        const otpExpiry = Date.now() + 10 * 60 * 1000;
-
         otpStore.set(email, {
-            otp,
-            expiry: otpExpiry,
-            userData: {
-                name,
-                email,
-                password: await bcrypt.hash(password, 10),
-                profileImage: profileImage || null
-            }
+            otp, expiry: Date.now() + 10 * 60 * 1000,
+            userData: { name, email, password: await bcrypt.hash(password, 10), profileImage: profileImage || null }
         });
-
-        // For demo only – in production, send OTP via email/SMS
-        res.status(200).json({
-            message: "OTP generated successfully",
-            email: email,
-            otp: otp,
-            expiresIn: "10 minutes"
-        });
-    } catch (error) {
-        console.error("Registration error:", error);
-        res.status(500).json({ error: "Registration failed" });
-    }
+        res.status(200).json({ message: "OTP generated", email, otp, expiresIn: "10 minutes" });
+    } catch (error) { res.status(500).json({ error: "Registration failed" }); }
 });
 
-// ========== VERIFY OTP ==========
 app.post("/verify-otp", async (req, res) => {
     const { email, otp } = req.body;
-    if (!email || !otp) {
-        return res.status(400).json({ error: "Email and OTP are required" });
-    }
-
+    if (!email || !otp) return res.status(400).json({ error: "Email and OTP required" });
     try {
         const storedData = otpStore.get(email);
-        if (!storedData) {
-            return res.status(400).json({ error: "OTP expired or not found. Please register again." });
-        }
-        if (Date.now() > storedData.expiry) {
-            otpStore.delete(email);
-            return res.status(400).json({ error: "OTP has expired. Please register again." });
-        }
-        if (storedData.otp !== otp) {
-            return res.status(400).json({ error: "Invalid OTP. Please try again." });
-        }
-
+        if (!storedData) return res.status(400).json({ error: "OTP expired or not found" });
+        if (Date.now() > storedData.expiry) { otpStore.delete(email); return res.status(400).json({ error: "OTP expired" }); }
+        if (storedData.otp !== otp) return res.status(400).json({ error: "Invalid OTP" });
         const { userData } = storedData;
-        const user = await User.create({
-            name: userData.name,
-            email: userData.email,
-            password: userData.password,
-            friend: [],
-            isVerified: true,
-            profileImage: userData.profileImage
-        });
-
-        const token = jwt.sign(
-            { _id: user._id, email: user.email },
-            JWT_SECRET,
-            { expiresIn: "7d" }
-        );
-
+        const user = await User.create({ ...userData, friend: [], isVerified: true });
+        const token = jwt.sign({ _id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
         otpStore.delete(email);
-
-        res.json({
-            message: "Email verified successfully!",
-            token,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                profileImage: user.profileImage
-            }
-        });
-    } catch (error) {
-        console.error("OTP verification error:", error);
-        res.status(500).json({ error: "Verification failed" });
-    }
+        res.json({ message: "Email verified", token, user: { id: user._id, name: user.name, email: user.email, profileImage: user.profileImage } });
+    } catch (error) { res.status(500).json({ error: "Verification failed" }); }
 });
 
-// ========== RESEND OTP ==========
 app.post("/resend-otp", async (req, res) => {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
-
-    try {
-        const storedData = otpStore.get(email);
-        if (!storedData) {
-            return res.status(400).json({ error: "No pending registration found" });
-        }
-        const newOtp = generateOTP();
-        const newExpiry = Date.now() + 10 * 60 * 1000;
-        storedData.otp = newOtp;
-        storedData.expiry = newExpiry;
-        otpStore.set(email, storedData);
-
-        res.json({ message: "New OTP generated", otp: newOtp });
-    } catch (error) {
-        console.error("Resend OTP error:", error);
-        res.status(500).json({ error: "Failed to resend OTP" });
-    }
+    if (!email) return res.status(400).json({ error: "Email required" });
+    const storedData = otpStore.get(email);
+    if (!storedData) return res.status(400).json({ error: "No pending registration" });
+    storedData.otp = generateOTP();
+    storedData.expiry = Date.now() + 10 * 60 * 1000;
+    otpStore.set(email, storedData);
+    res.json({ message: "New OTP generated", otp: storedData.otp });
 });
 
-// ========== LOGIN ==========
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ error: "Email is wrong" });
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "Password is wrong" });
-    const token = jwt.sign(
-        { _id: user._id },
-        JWT_SECRET,
-        { expiresIn: "7d" }
-    );
+    if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: "Password is wrong" });
+    const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: "7d" });
     res.json({ token, name: user.name, profileImage: user.profileImage });
 });
 
-// ========== AUTH MIDDLEWARE ==========
 const auth = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: "No token provided" });
     const token = authHeader.split(" ")[1];
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.userid = decoded._id;
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: "Invalid token" });
-    }
+    try { req.userid = jwt.verify(token, JWT_SECRET)._id; next(); }
+    catch (err) { return res.status(401).json({ error: "Invalid token" }); }
 };
 
-// ========== TOKEN VERIFICATION (FIXED) ==========
 app.post("/verify-token", auth, async (req, res) => {
-    // Check if user still exists in database
     const user = await User.findById(req.userid);
-    if (!user) {
-        return res.status(401).json({ error: "User not found", valid: false });
-    }
+    if (!user) return res.status(401).json({ error: "User not found", valid: false });
     res.json({ valid: true, userId: req.userid });
-});
-
-// ========== OTHER API ENDPOINTS ==========
-app.post("/users", async (req, res) => {
-    const allUsers = await User.find({}, "_id name profileImage");
-    res.send(allUsers);
 });
 
 app.post("/fetchmsg", auth, async (req, res) => {
     const sender = req.userid;
     const { receiver } = req.body;
-    const msg = await Msg.find({
-        $or: [
-            { sender, receiver },
-            { sender: receiver, receiver: sender }
-        ]
+    const messages = await Msg.find({
+        $or: [{ sender, receiver }, { sender: receiver, receiver: sender }]
     }).sort({ createdAt: 1 });
-    const formattedMessages = msg.map(message => ({
-        text: message.text,
-        sender: message.sender,
-        receiver: message.receiver,
-        isOwn: message.sender.toString() === sender.toString()
+    const formattedMessages = messages.map(msg => ({
+        _id: msg._id, text: msg.text, isOwn: msg.sender.toString() === sender.toString(),
+        createdAt: msg.createdAt, delivered: msg.delivered, seen: msg.seen
     }));
     res.json({ msg: formattedMessages, currentuser: req.userid });
 });
 
+app.post("/users", async (req, res) => { res.send(await User.find({}, "_id name profileImage")); });
 app.post("/request", auth, async (req, res) => {
-    const { receiver } = req.body;
-    const newRequest = await Request.create({ sender: req.userid, receiver, status: "pending" });
+    const newRequest = await Request.create({ sender: req.userid, receiver: req.body.receiver, status: "pending" });
     res.send({ requestId: newRequest._id });
 });
-
 app.post("/request-show", auth, async (req, res) => {
     const requests = await Request.find({ receiver: req.userid, status: "pending" }).populate("sender", "name profileImage");
     res.send(requests);
 });
-
 app.post("/accept-request/:id", async (req, res) => {
     const accept = await Request.findByIdAndUpdate(req.params.id, { status: "accepted" }, { returnDocument: "after" });
     await User.findByIdAndUpdate(accept.sender, { $addToSet: { friend: accept.receiver } });
     await User.findByIdAndUpdate(accept.receiver, { $addToSet: { friend: accept.sender } });
     res.send(accept);
 });
-
 app.get("/friends", auth, async (req, res) => {
     const user = await User.findById(req.userid).populate("friend", "_id name profileImage");
     res.json(user.friend);
 });
 
-// ========== SERVE REACT FRONTEND (if built) ==========
-const frontendBuildPath = path.join(__dirname, "../client-side/dist");
-if (fs.existsSync(frontendBuildPath)) {
-    app.use(express.static(frontendBuildPath));
-    app.get("*", (req, res, next) => {
-        const requestPath = req.path;
-        if (requestPath.startsWith("/api") || 
-            requestPath === "/upload-image" || 
-            requestPath === "/login" || 
-            requestPath === "/register" ||
-            requestPath === "/verify-otp" ||
-            requestPath === "/resend-otp" ||
-            requestPath === "/verify-token" ||
-            requestPath.startsWith("/uploads")) {
-            return next();
-        }
-        res.sendFile(path.join(frontendBuildPath, "index.html"));
-    });
-} else {
-    console.log("⚠️ Frontend build not found. API only.");
-}
+app.get("/unread-counts", auth, async (req, res) => {
+    try {
+        const userId = req.userid;
+        const user = await User.findById(userId).populate("friend", "_id");
+        const friendIds = user.friend.map(f => f._id);
+        const unreadCounts = await Msg.aggregate([
+            { $match: { sender: { $in: friendIds }, receiver: userId, seen: false } },
+            { $group: { _id: "$sender", count: { $sum: 1 } } }
+        ]);
+        const result = {};
+        unreadCounts.forEach(item => { result[item._id.toString()] = item.count; });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ========== SOCKET.IO ==========
-const io = new Server(server, { 
-    cors: { 
-        origin: allowedOrigins,
-        credentials: true 
-    } 
-});
+const io = new Server(server, { cors: { origin: allowedOrigins, credentials: true } });
+const onlineUsers = new Map();   // userId -> socketId
+const userCurrentChat = new Map(); // userId -> chatPartnerId
 
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        socket.userid = decoded._id;
-        next();
-    } catch (err) {
-        next(new Error("Invalid token"));
-    }
+    try { socket.userid = jwt.verify(token, JWT_SECRET)._id; next(); }
+    catch (err) { next(new Error("Invalid token")); }
 });
 
-const activeChat = {};
 io.on("connection", (socket) => {
     const userId = socket.userid?.toString();
     if (!userId) return;
+    onlineUsers.set(userId, socket.id);
     socket.join(userId);
-    socket.on("joinChat", (receiverID) => {
+    socket.broadcast.emit("user_online", userId);
+
+    socket.on("joinChat", async (receiverID) => {
         const receiverIdStr = receiverID.toString();
-        activeChat[userId] = receiverIdStr;
-        activeChat[receiverIdStr] = userId;
+        userCurrentChat.set(userId, receiverIdStr);
+        await Msg.updateMany({ sender: receiverIdStr, receiver: userId, delivered: false }, { delivered: true });
+        await Msg.updateMany({ sender: receiverIdStr, receiver: userId, seen: false }, { seen: true });
+        io.to(receiverIdStr).emit("messages_delivered", { by: userId });
+        io.to(receiverIdStr).emit("messages_seen", { by: userId });
     });
-    socket.on("pass_indicator", ({ id, text }) => {
-        if (id) io.to(id).emit("typing_indicator", { text: "typing" });
+
+    socket.on("leaveChat", (receiverID) => {
+        if (userCurrentChat.get(userId) === receiverID?.toString()) userCurrentChat.delete(userId);
     });
+
+    socket.on("pass_indicator", ({ id }) => { if (id) io.to(id).emit("typing_indicator", { text: "typing" }); });
+
     socket.on("send_message", async ({ text, id }) => {
         if (!text || !id) return;
-        const senderId = userId;
-        const receiverId = id.toString();
-        await Msg.create({ sender: senderId, receiver: receiverId, text });
-        io.to(receiverId).emit("receive_message", { text, sender: senderId, timestamp: new Date() });
+        const senderId = userId, receiverId = id.toString();
+        const newMsg = await Msg.create({ sender: senderId, receiver: receiverId, text, delivered: false, seen: false });
+        const messageObj = { _id: newMsg._id, text, sender: senderId, createdAt: newMsg.createdAt, delivered: false, seen: false };
+        if (onlineUsers.has(receiverId)) {
+            await Msg.findByIdAndUpdate(newMsg._id, { delivered: true });
+            messageObj.delivered = true;
+            io.to(receiverId).emit("receive_message", messageObj);
+            socket.emit("message_sent", { _id: newMsg._id, text, receiver: receiverId, createdAt: newMsg.createdAt, delivered: true });
+            if (userCurrentChat.get(receiverId) !== senderId) {
+                const unreadCount = await Msg.countDocuments({ sender: senderId, receiver: receiverId, seen: false });
+                io.to(receiverId).emit("new_message_notification", { from: senderId, count: unreadCount });
+            }
+        } else {
+            socket.emit("message_sent", { _id: newMsg._id, text, receiver: receiverId, createdAt: newMsg.createdAt, delivered: false });
+        }
     });
+
+    socket.on("mark_delivered", async ({ senderId }) => {
+        const result = await Msg.updateMany({ sender: senderId, receiver: userId, delivered: false }, { delivered: true });
+        if (result.modifiedCount > 0) io.to(senderId).emit("messages_delivered", { by: userId });
+    });
+
+    socket.on("mark_seen", async ({ senderId }) => {
+        const result = await Msg.updateMany({ sender: senderId, receiver: userId, seen: false }, { seen: true });
+        if (result.modifiedCount > 0) io.to(senderId).emit("messages_seen", { by: userId });
+    });
+
     socket.on("disconnect", () => {
-        delete activeChat[userId];
-        for (let key in activeChat) if (activeChat[key] === userId) delete activeChat[key];
+        onlineUsers.delete(userId);
+        userCurrentChat.delete(userId);
+        socket.broadcast.emit("user_offline", userId);
     });
 });
 
-// ========== START SERVER ==========
-const PORT = process.env.PORT || 3001;
-connectDB()
-    .then(() => {
-        server.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`✅ Database connected`);
-            console.log(`🌍 CORS enabled for: ${allowedOrigins.join(", ")}`);
-        });
-    })
-    .catch(err => {
-        console.error("❌ Database connection failed:", err);
-        process.exit(1);
+// Serve frontend build if exists
+const frontendBuildPath = path.join(__dirname, "../client-side/dist");
+if (fs.existsSync(frontendBuildPath)) {
+    app.use(express.static(frontendBuildPath));
+    app.get("*", (req, res, next) => {
+        if (req.path.startsWith("/api") || req.path === "/upload-image" || req.path === "/login" || req.path === "/register" || req.path === "/verify-otp" || req.path === "/resend-otp" || req.path === "/verify-token" || req.path.startsWith("/uploads")) return next();
+        res.sendFile(path.join(frontendBuildPath, "index.html"));
     });
+} else console.log("⚠️ Frontend build not found. API only.");
+
+const PORT = process.env.PORT || 3001;
+connectDB().then(() => server.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`))).catch(err => { console.error("DB connection failed:", err); process.exit(1); });
