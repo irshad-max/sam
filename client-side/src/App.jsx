@@ -15,6 +15,60 @@ function App() {
     profileImage: ""
   })
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
+  const [isCheckingToken, setIsCheckingToken] = useState(true)  // to avoid flickering
+
+  // Check for existing token on app load
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token")
+    if (storedToken) {
+      // Optional: validate token with backend
+      validateToken(storedToken)
+    } else {
+      setIsCheckingToken(false)
+    }
+  }, [])
+
+  const validateToken = async (storedToken) => {
+    try {
+      // Send token to a verification endpoint (adjust URL as needed)
+      const response = await axios.post('/verify-token', {}, {
+        headers: { Authorization: `Bearer ${storedToken}` }
+      })
+      if (response.data.valid) {
+        setToken(storedToken)
+        setshow(true)
+      } else {
+        // Token invalid → clear storage
+        localStorage.removeItem("token")
+        setshow(false)
+      }
+    } catch (error) {
+      // If backend returns 401 or any error, assume token is invalid
+      console.error("Token validation failed", error)
+      localStorage.removeItem("token")
+      setshow(false)
+    } finally {
+      setIsCheckingToken(false)
+    }
+  }
+
+  // Optional: add an axios interceptor to handle 401 globally
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid → logout
+          localStorage.removeItem("token")
+          setToken("")
+          setshow(false)
+          setShowChat(false)
+        }
+        return Promise.reject(error)
+      }
+    )
+    return () => axios.interceptors.response.eject(interceptor)
+  }, [])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -65,6 +119,11 @@ function App() {
   const handleBack = () => {
     setShowChat(false)
   };
+
+  // While checking token, show nothing or a loading spinner
+  if (isCheckingToken) {
+    return <div style={{ background: "#0a0a0a", color: "#00ff00", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading...</div>
+  }
 
   if (isMobile) {
     return (
@@ -141,6 +200,8 @@ function App() {
     </>
   )
 }
+
+// ... (keep your existing styles and global animations)
 
 const styles = {
   mobileContainer: {
