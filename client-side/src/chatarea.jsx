@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
 const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
-  const emojis = [
+ const emojis = [
     '🐦', '⃤💘', '⃟👋', '⃝🌷', '🦅', '♕', '🌹','🔥',
     '🏵️', '💮', '💐', '元', '🃏', '🎴', '🎭', '🏴‍☠️', '🏴', '🏳️', '🌌',
     '❄️', '🌘', '⨌', '⏰', '✂️', '💴', '🎸', '🎶', '👽', '🕉️',
@@ -63,11 +63,12 @@ const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
   );
 };
 
+// ========== MAIN CHATAREA COMPONENT ==========
 const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack }) => {
   const [text, setText] = useState("");
   const [indicator, setindicator] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const socketRef = useRef(null);
@@ -75,27 +76,21 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ✅ HARDWARE BACK BUTTON – safe version without breaking layout
-  useEffect(() => {
-    if (!isMobile || !onBack) return;
-    const handlePopState = (e) => {
-      e.preventDefault();
-      onBack(); // go back to sidebar
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [isMobile, onBack]);
-
-  // Socket connection
+  // Socket connection – relative URL (empty string)
   useEffect(() => {
     if (!token) return;
-    socketRef.current = io("", { auth: { token } });
+    socketRef.current = io("", {
+      auth: { token }
+    });
+
     socketRef.current.on("receive_message", (msg) => {
       setMessages((prev) => [...prev, {
         text: msg.text,
@@ -105,16 +100,22 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       }]);
       setindicator("");
     });
+
     return () => socketRef.current?.disconnect();
   }, [token]);
 
   // Typing indicator
   useEffect(() => {
     if (!id) return;
-    socketRef.current?.emit("pass_indicator", { id });
-    socketRef.current?.on("typing_indicator", (notify) => setindicator(notify.text));
+
+    socketRef.current.emit("pass_indicator", { id });
+    socketRef.current.on("typing_indicator", (notify) => {
+      setindicator(notify.text);
+    });
+
     return () => {
       socketRef.current?.off("typing_indicator");
+      socketRef.current?.off("pass_indicator");
       setindicator("");
     };
   }, [text, id]);
@@ -134,16 +135,20 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   }, [uid, prev_msg]);
 
-  // Auto scroll
+  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const onSelectEmoji = (emoji) => setText(prev => prev + emoji);
+  const onSelectEmoji = (emoji) => {
+    setText(prev => prev + emoji);
+  };
+
   const send = () => {
     if (!text.trim() || !id) return;
+
     socketRef.current?.emit("send_message", { text, id });
-    setMessages(prev => [...prev, { text, isOwn: true, timestamp: new Date() }]);
+    setMessages((prev) => [...prev, { text, isOwn: true, timestamp: new Date() }]);
     setText("");
   };
 
@@ -152,6 +157,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
   const getStatusIcon = (msg) => {
     if (!msg.isOwn) return null;
     return msg.seen ?
@@ -196,7 +202,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       display: "flex",
       flexDirection: "column",
       background: "linear-gradient(180deg, #1f2937, #111827)",
-      height: "100%",          // ✅ use 100% instead of 100vh (parent must have height)
+      height: "100vh",
       width: "100%",
       overflow: "hidden"
     },
@@ -208,8 +214,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       padding: isMobile ? "8px 12px" : "12px 20px",
       background: "rgba(255,255,255,0.05)",
       backdropFilter: "blur(10px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)",
-      flexShrink: 0
+      borderBottom: "1px solid rgba(255,255,255,0.08)"
     },
     headerLeft: {
       display: "flex",
@@ -287,8 +292,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       padding: responsive.inputPadding,
       background: "#1f2937",
       borderTop: "1px solid rgba(255,255,255,0.08)",
-      position: "relative",
-      flexShrink: 0
+      position: "relative"
     },
     inputWrapper: {
       display: "flex",
@@ -335,16 +339,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   };
 
-  // ✅ Ensure parent containers have 100% height so that wrapper's height:100% works
-  useEffect(() => {
-    const root = document.getElementById('root');
-    if (root) root.style.height = '100%';
-    document.body.style.height = '100%';
-    document.documentElement.style.height = '100%';
-    document.body.style.margin = '0';
-    document.body.style.padding = '0';
-  }, []);
-
   if (!selectedUser) {
     return (
       <div style={styles.wrapper}>
@@ -380,7 +374,9 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
               src={Userprofile || "https://via.placeholder.com/40"}
               alt="Profile"
               style={styles.avatarImage}
-              onError={(e) => e.target.src = "https://via.placeholder.com/40"}
+              onError={(e) => {
+                e.target.src = "https://via.placeholder.com/40";
+              }}
             />
           </div>
           <div style={styles.userInfo}>
@@ -433,9 +429,13 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={styles.emojiBtn}>
+          <button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            style={styles.emojiBtn}
+          >
             😊
           </button>
+
           <input
             ref={inputRef}
             value={text}
@@ -444,11 +444,18 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
             placeholder="Type a message..."
             style={styles.input}
           />
+
           <button onClick={send} style={styles.sendBtn}>
             ➤
           </button>
         </div>
-        {showEmojiPicker && <EmojiPickerComponent onEmojiSelect={onSelectEmoji} onClose={() => setShowEmojiPicker(false)} />}
+
+        {showEmojiPicker && (
+          <EmojiPickerComponent
+            onEmojiSelect={onSelectEmoji}
+            onClose={() => setShowEmojiPicker(false)}
+          />
+        )}
       </div>
     </div>
   );
