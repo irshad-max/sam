@@ -42,7 +42,11 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     const socket = io("", { auth: { token } });
     socketRef.current = socket;
 
+    // ✅ FIXED: Only process messages intended for this chat
     socket.on("receive_message", (msg) => {
+      // Check if the message sender is the current chat partner (id)
+      if (msg.sender !== id) return;   // 👈 YEH LINE IMPORTANT HAI
+
       setMessages(prev => [...prev, {
         _id: msg._id,
         text: msg.text,
@@ -52,10 +56,13 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         timestamp: msg.createdAt
       }]);
       setindicator("");
+      
+      // Auto mark as seen if this chat is open
       if (id === msg.sender) {
         socketRef.current?.emit("mark_seen", { senderId: msg.sender });
       }
     });
+
     socket.on("message_sent", (msg) => {
       setMessages(prev => prev.map(m => m._id === msg._id ? { ...m, _id: msg._id, timestamp: msg.createdAt, delivered: msg.delivered } : m));
     });
@@ -63,17 +70,13 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     socket.on("messages_seen", ({ by }) => { if (by === id) setMessages(prev => prev.map(m => m.isOwn && !m.seen ? { ...m, seen: true, delivered: true } : m)); });
     socket.on("user_online", (userId) => { if (userId === id) setOnlineStatus(true); });
     socket.on("user_offline", (userId) => { if (userId === id) setOnlineStatus(false); });
-
-    // ✅ Typing indicator stop event
     socket.on("stop_typing_indicator", () => setindicator(""));
-
-    // ✅ Online status response
     socket.on("online_status", ({ userId, isOnline }) => { if (userId === id) setOnlineStatus(isOnline); });
 
     return () => socket?.disconnect();
   }, [token, id]);
 
-  // ✅ Request online status when chat opens
+  // Request online status when chat opens
   useEffect(() => {
     if (!id || !socketRef.current) return;
     socketRef.current.emit("check_online", { userId: id });
@@ -82,7 +85,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     socketRef.current.emit("joinChat", id);
   }, [id]);
 
-  // ✅ Typing indicator with debounce (stop typing after 1.5 sec)
+  // Typing indicator with debounce
   useEffect(() => {
     if (!id || !socketRef.current) return;
     let typingTimeout;
