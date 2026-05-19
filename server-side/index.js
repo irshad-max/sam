@@ -191,6 +191,12 @@ io.on("connection", (socket) => {
     socket.join(userId);
     socket.broadcast.emit("user_online", userId);
 
+    // ✅ NEW: Check online status of a specific user
+    socket.on("check_online", ({ userId: targetUserId }) => {
+        const isOnline = onlineUsers.has(targetUserId);
+        socket.emit("online_status", { userId: targetUserId, isOnline });
+    });
+
     socket.on("joinChat", async (receiverID) => {
         const receiverIdStr = receiverID.toString();
         userCurrentChat.set(userId, receiverIdStr);
@@ -204,7 +210,14 @@ io.on("connection", (socket) => {
         if (userCurrentChat.get(userId) === receiverID?.toString()) userCurrentChat.delete(userId);
     });
 
-    socket.on("pass_indicator", ({ id }) => { if (id) io.to(id).emit("typing_indicator", { text: "typing" }); });
+    socket.on("pass_indicator", ({ id }) => { 
+        if (id) io.to(id).emit("typing_indicator", { text: "typing" }); 
+    });
+
+    // ✅ NEW: Stop typing indicator
+    socket.on("stop_typing", ({ id }) => {
+        if (id) io.to(id).emit("stop_typing_indicator");
+    });
 
     socket.on("send_message", async ({ text, id }) => {
         if (!text || !id) return;
