@@ -3,7 +3,7 @@ import Auth from './LOGINPAGE';
 import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatArea from './chatarea';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from "jwt-decode";
 
 function App() {
   const [show, setShow] = useState(false);
