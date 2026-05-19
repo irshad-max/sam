@@ -67,22 +67,23 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const [text, setText] = useState("");
   const [indicator, setIndicator] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Mobile detect
+  // Handle resize & orientation
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Hardware back button handler
+  // Hardware back button
   useEffect(() => {
     if (!isMobile || !onBack) return;
     window.history.pushState(null, '', window.location.href);
@@ -165,149 +166,176 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
   };
 
-  // ✅ FIXED: No fixed positioning, pure flex – header always visible
-  const styles = {
-    wrapper: {
-      display: "flex",
-      flexDirection: "column",
-      background: "linear-gradient(180deg, #1f2937, #111827)",
-      width: "100%",
-      height: "100%",
-      overflow: "hidden"
-    },
-    header: {
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "10px 16px",
-      background: "rgba(255,255,255,0.05)",
-      backdropFilter: "blur(10px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)",
-      minHeight: "60px"
-    },
-    headerLeft: {
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-      flex: 1
-    },
-    backButton: {
-      background: "transparent",
-      border: "none",
-      fontSize: "28px",
-      color: "white",
-      cursor: "pointer",
-      width: "36px",
-      height: "36px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: "50%"
-    },
-    avatar: {
-      width: "44px",
-      height: "44px",
-      borderRadius: "50%",
-      overflow: "hidden",
-      flexShrink: 0,
-      background: "#374151"
-    },
-    avatarImage: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    },
-    userInfo: {
-      flex: 1,
-      minWidth: 0
-    },
-    name: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "#f3f4f6",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis"
-    },
-    sub: {
-      fontSize: "12px",
-      color: "#9ca3af"
-    },
-    chatBox: {
-      flex: 1,
-      overflowY: "auto",
-      padding: "12px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px"
-    },
-    bubble: {
-      padding: "10px 14px",
-      borderRadius: "18px",
-      fontSize: "15px",
-      color: "#fff",
-      wordBreak: "break-word",
-      maxWidth: isMobile ? "80%" : "70%",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
-    },
-    messageFooter: {
-      display: "flex",
-      justifyContent: "flex-end",
-      alignItems: "center",
-      gap: "4px",
-      marginTop: "2px",
-      marginRight: "8px"
-    },
-    inputBox: {
-      flexShrink: 0,
-      padding: "10px 12px",
-      background: "#1f2937",
-      borderTop: "1px solid rgba(255,255,255,0.08)"
-    },
-    inputWrapper: {
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      background: "#374151",
-      borderRadius: "28px",
-      padding: "4px 12px"
-    },
-    emojiBtn: {
-      background: "transparent",
-      border: "none",
-      width: "36px",
-      height: "36px",
-      fontSize: "22px",
-      cursor: "pointer",
-      color: "#9ca3af",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    input: {
-      flex: 1,
-      padding: "8px 4px",
-      border: "none",
-      outline: "none",
-      background: "transparent",
-      color: "#fff",
-      fontSize: "16px"
-    },
-    sendBtn: {
-      background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-      border: "none",
-      borderRadius: "50%",
-      width: "36px",
-      height: "36px",
-      color: "#fff",
-      fontSize: "16px",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
+  // ----- STYLES (exactly like Sidebar) -----
+  const colorStyles = {
+    primary: "#4f46e5",
+    background: "#111827",
+    surface: "#1f2937",
+    text: "#f3f4f6",
+    textSecondary: "#9ca3af"
   };
+
+  const getStyles = () => {
+    const mobile = isMobile;
+    return {
+      wrapper: {
+        display: "flex",
+        flexDirection: "column",
+        background: `linear-gradient(180deg, ${colorStyles.surface}, ${colorStyles.background})`,
+        height: "100vh",
+        width: "100%",
+        overflow: "hidden",
+        position: "relative"
+      },
+      header: {
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: mobile ? "8px 12px" : "12px 20px",
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(10px)",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        minHeight: "60px"
+      },
+      headerLeft: {
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        flex: 1
+      },
+      backButton: {
+        background: "transparent",
+        border: "none",
+        fontSize: "28px",
+        color: "#fff",
+        cursor: "pointer",
+        width: "36px",
+        height: "36px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "50%"
+      },
+      avatar: {
+        width: mobile ? "40px" : "44px",
+        height: mobile ? "40px" : "44px",
+        borderRadius: "50%",
+        overflow: "hidden",
+        flexShrink: 0,
+        background: colorStyles.surface
+      },
+      avatarImage: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover"
+      },
+      userInfo: {
+        flex: 1,
+        minWidth: 0
+      },
+      name: {
+        fontSize: mobile ? "15px" : "16px",
+        fontWeight: "600",
+        color: colorStyles.text,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      },
+      sub: {
+        fontSize: "11px",
+        color: colorStyles.textSecondary,
+        marginTop: "2px"
+      },
+      chatBox: {
+        flex: 1,
+        overflowY: "auto",
+        padding: mobile ? "12px" : "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px"
+      },
+      bubble: {
+        padding: "10px 14px",
+        borderRadius: "18px",
+        fontSize: mobile ? "14px" : "15px",
+        color: "#fff",
+        wordBreak: "break-word",
+        maxWidth: mobile ? "80%" : "70%",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
+      },
+      messageFooter: {
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: "4px",
+        marginTop: "2px",
+        marginRight: "8px"
+      },
+      inputBox: {
+        flexShrink: 0,
+        padding: mobile ? "8px 12px" : "10px 16px",
+        background: colorStyles.surface,
+        borderTop: "1px solid rgba(255,255,255,0.08)"
+      },
+      inputWrapper: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        background: "#374151",
+        borderRadius: "28px",
+        padding: "4px 12px"
+      },
+      emojiBtn: {
+        background: "transparent",
+        border: "none",
+        width: "36px",
+        height: "36px",
+        fontSize: "22px",
+        cursor: "pointer",
+        color: colorStyles.textSecondary
+      },
+      input: {
+        flex: 1,
+        padding: "8px 4px",
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        color: "#fff",
+        fontSize: mobile ? "15px" : "16px"
+      },
+      sendBtn: {
+        background: `linear-gradient(135deg, ${colorStyles.primary}, #764ba2)`,
+        border: "none",
+        borderRadius: "50%",
+        width: "36px",
+        height: "36px",
+        color: "#fff",
+        fontSize: "16px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    };
+  };
+
+  const styles = getStyles();
+
+  // Global CSS reset (remove margins/paddings from html/body)
+  useEffect(() => {
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important;
+      }
+    `;
+    document.head.appendChild(styleTag);
+    return () => document.head.removeChild(styleTag);
+  }, []);
 
   if (!selectedUser) {
     return (
@@ -325,7 +353,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
   return (
     <div style={styles.wrapper}>
-      {/* Header – always on top */}
+      {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           {isMobile && (
@@ -348,7 +376,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* Messages */}
       <div style={styles.chatBox}>
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", color: "#6b7280", marginTop: "40px" }}>
@@ -366,7 +394,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
                 <div
                   style={{
                     ...styles.bubble,
-                    background: m.isOwn ? "#4f46e5" : "#1f2937",
+                    background: m.isOwn ? colorStyles.primary : "#1f2937",
                     borderBottomRightRadius: m.isOwn ? "4px" : "18px",
                     borderBottomLeftRadius: m.isOwn ? "18px" : "4px"
                   }}
@@ -386,7 +414,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input bar */}
+      {/* Input */}
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={styles.emojiBtn}>
