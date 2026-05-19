@@ -4,10 +4,6 @@ import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatArea from './chatarea';
 
-// Set base URL for axios – adjust according to your environment
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-axios.defaults.baseURL = API_BASE_URL;
-
 function App() {
   const [show, setShow] = useState(false);
   const [token, setToken] = useState("");
