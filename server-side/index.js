@@ -57,7 +57,7 @@ const fileFilter = (req, file, cb) => {
     if (mimetype && extname) return cb(null, true);
     cb(new Error("Only image files are allowed"));
 };
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 
 app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     try {
