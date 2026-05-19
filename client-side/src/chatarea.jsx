@@ -43,8 +43,18 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     socketRef.current = socket;
 
     socket.on("receive_message", (msg) => {
-      setMessages(prev => [...prev, { _id: msg._id, text: msg.text, isOwn: false, delivered: msg.delivered || false, seen: msg.seen || false, timestamp: msg.createdAt }]);
+      setMessages(prev => [...prev, {
+        _id: msg._id,
+        text: msg.text,
+        isOwn: false,
+        delivered: msg.delivered || false,
+        seen: msg.seen || false,
+        timestamp: msg.createdAt
+      }]);
       setindicator("");
+      if (id === msg.sender) {
+        socketRef.current?.emit("mark_seen", { senderId: msg.sender });
+      }
     });
     socket.on("message_sent", (msg) => {
       setMessages(prev => prev.map(m => m._id === msg._id ? { ...m, _id: msg._id, timestamp: msg.createdAt, delivered: msg.delivered } : m));
@@ -53,10 +63,10 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     socket.on("messages_seen", ({ by }) => { if (by === id) setMessages(prev => prev.map(m => m.isOwn && !m.seen ? { ...m, seen: true, delivered: true } : m)); });
     socket.on("user_online", (userId) => { if (userId === id) setOnlineStatus(true); });
     socket.on("user_offline", (userId) => { if (userId === id) setOnlineStatus(false); });
-    
+
     // ✅ Typing indicator stop event
     socket.on("stop_typing_indicator", () => setindicator(""));
-    
+
     // ✅ Online status response
     socket.on("online_status", ({ userId, isOnline }) => { if (userId === id) setOnlineStatus(isOnline); });
 
@@ -123,9 +133,9 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     sendBtn: { background: "linear-gradient(135deg, #6366f1, #4f46e5)", border: "none", borderRadius: "50%", width: "36px", height: "36px", color: "#fff", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
     stopDragBtn: { background: "#ef4444", border: "none", borderRadius: "20px", padding: "4px 12px", color: "white", fontSize: "12px", cursor: "pointer" },
   };
-  
+
   if (!selectedUser) return (<div style={styles.wrapper}><div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "20px" }}><div><div style={{ fontSize: "80px", marginBottom: "20px" }}>💬</div><h3 style={{ color: "#fff" }}>Welcome to ChatApp</h3><p style={{ color: "#9ca3af" }}>Select a friend to start messaging</p></div></div></div>);
-  
+
   return (
     <div style={styles.wrapper} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       <div style={styles.dragHandle} />
