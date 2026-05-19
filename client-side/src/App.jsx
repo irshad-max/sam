@@ -201,8 +201,6 @@ function App() {
   )
 }
 
-// ... (keep your existing styles and global animations)
-
 const styles = {
   mobileContainer: {
     width: "100%",

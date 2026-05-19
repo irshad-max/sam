@@ -68,8 +68,7 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     }
 });
 
-// ========== OTP STORAGE (in‑memory – for demo only) ==========
-const otpStore = new Map(); // email -> { otp, expiry, userData }
+const otpStore = new Map(); 
 
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -115,7 +114,7 @@ app.post("/register", async (req, res) => {
     }
 });
 
-// ========== VERIFY OTP AND CREATE USER ==========
+
 app.post("/verify-otp", async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -207,6 +206,7 @@ app.post("/login", async (req, res) => {
     res.json({ token, name: verify.name, profileImage: verify.profileImage });
 });
 
+
 // ========== AUTH MIDDLEWARE ==========
 const auth = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -221,6 +221,10 @@ const auth = (req, res, next) => {
     }
 };
 
+app.post("/verify-token", auth, (req, res) => {
+    // If we reach here, the token is valid
+    res.json({ valid: true, userId: req.userid });
+});
 // ========== OTHER API ENDPOINTS ==========
 app.post("/users", async (req, res) => {
     const alluser = await User.find({}, "_id name profileImage");
