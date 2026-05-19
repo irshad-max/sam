@@ -3,54 +3,59 @@ import { io } from "socket.io-client";
 
 const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
   const emojis = [
-    '🐦', '⃤💘', '⃟👋', '⃝🌷', '🦅', '♕', '🌹','🔥',
-    '🏵️', '💮', '💐', '元', '🃏', '🎴', '🎭', '🏴‍☠️', '🏴', '🏳️', '🌌',
-    '❄️', '🌘', '⨌', '⏰', '✂️', '💴', '🎸', '🎶', '👽', '🕉️',
-    '🕌', '🧿', '🎃', '🦄', '🧞', '🍭', '🔮', '🎭', '🕷️', '⛱', 
-    '🌀', '🎯', '❎', '✅', '📵', '☎','🧙‍♂️','👨‍🦼','✍︎','✌︎','🎰',
-    '♞','🕹','♝','🎻','🂫','🂡','🀢','🀣','🀤','🦉','🕶️','💍','💄',
-    '🧥'
+    "🐦", "⃤💘", "⃟👋", "⃝🌷", "🦅", "♕", "🌹", "🔥",
+    "🏵️", "💮", "💐", "元", "🃏", "🎴", "🎭", "🏴‍☠️", "🏴", "🏳️", "🌌",
+    "❄️", "🌘", "⨌", "⏰", "✂️", "💴", "🎸", "🎶", "👽", "🕉️",
+    "🕌", "🧿", "🎃", "🦄", "🧞", "🍭", "🔮", "🎭", "🕷️", "⛱",
+    "🌀", "🎯", "❎", "✅", "📵", "☎", "🧙‍♂️", "👨‍🦼", "✍︎", "✌︎", "🎰",
+    "♞", "🕹", "♝", "🎻", "🂫", "🂡", "🀢", "🀣", "🀤", "🦉", "🕶️", "💍", "💄",
+    "🧥",
   ];
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(8, 1fr)',
-      gap: '8px',
-      padding: '15px',
-      background: '#1f2937',
-      borderRadius: '16px',
-      width: '350px',
-      maxWidth: '90vw',
-      maxHeight: '400px',
-      overflowY: 'auto',
-      border: '1px solid #4f46e5',
-      boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
-      position: 'absolute',
-      bottom: '70px',
-      right: '10px',
-      zIndex: 1000
-    }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(8, 1fr)",
+        gap: "8px",
+        padding: "15px",
+        background: "#1f2937",
+        borderRadius: "16px",
+        width: "350px",
+        maxWidth: "90vw",
+        maxHeight: "400px",
+        overflowY: "auto",
+        border: "1px solid #4f46e5",
+        boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+        position: "absolute",
+        bottom: "70px",
+        right: "10px",
+        zIndex: 1000,
+      }}
+    >
       {emojis.map((emoji, index) => (
         <button
           key={index}
-          onClick={() => { onEmojiSelect(emoji); onClose(); }}
+          onClick={() => {
+            onEmojiSelect(emoji);
+            onClose();
+          }}
           style={{
-            fontSize: '28px',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '8px',
-            transition: 'all 0.2s ease'
+            fontSize: "28px",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: "8px",
+            borderRadius: "8px",
+            transition: "all 0.2s ease",
           }}
           onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.2)';
-            e.target.style.background = '#4f46e520';
+            e.target.style.transform = "scale(1.2)";
+            e.target.style.background = "#4f46e520";
           }}
           onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-            e.target.style.background = 'transparent';
+            e.target.style.transform = "scale(1)";
+            e.target.style.background = "transparent";
           }}
         >
           {emoji}
@@ -66,34 +71,37 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const [messages, setMessages] = useState([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  
-  // Dragging state
   const [dragOffset, setDragOffset] = useState(0);
   const dragStartY = useRef(0);
   const isDragging = useRef(false);
-  const containerRef = useRef(null);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Mobile detection
+  // Detect mobile
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Hardware back button (closes chat)
+  // Hardware back button: closes chat and shows sidebar (does not exit app)
   useEffect(() => {
     if (!isMobile || !onBack) return;
+    // Push a dummy state to intercept back button
+    window.history.pushState(null, "", window.location.href);
     const handlePopState = (e) => {
       e.preventDefault();
-      onBack();
+      onBack(); // closes chat, sidebar becomes visible
+      window.history.pushState(null, "", window.location.href);
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.history.back();
+    };
   }, [isMobile, onBack]);
 
   // Socket connection
@@ -101,12 +109,15 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     if (!token) return;
     socketRef.current = io("", { auth: { token } });
     socketRef.current.on("receive_message", (msg) => {
-      setMessages(prev => [...prev, {
-        text: msg.text,
-        isOwn: false,
-        seen: false,
-        timestamp: new Date()
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: msg.text,
+          isOwn: false,
+          seen: false,
+          timestamp: new Date(),
+        },
+      ]);
       setindicator("");
     });
     return () => socketRef.current?.disconnect();
@@ -126,11 +137,11 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   // Load previous messages
   useEffect(() => {
     if (uid && prev_msg && Array.isArray(prev_msg)) {
-      const formatted = prev_msg.map(msg => ({
+      const formatted = prev_msg.map((msg) => ({
         text: msg.text,
         isOwn: msg.isOwn === true,
         seen: msg.seen || false,
-        timestamp: msg.createdAt || new Date()
+        timestamp: msg.createdAt || new Date(),
       }));
       setMessages(formatted);
     } else {
@@ -138,82 +149,77 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   }, [uid, prev_msg]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const onSelectEmoji = (emoji) => setText(prev => prev + emoji);
+  const onSelectEmoji = (emoji) => setText((prev) => prev + emoji);
   const send = () => {
     if (!text.trim() || !id) return;
     socketRef.current?.emit("send_message", { text, id });
-    setMessages(prev => [...prev, { text, isOwn: true, timestamp: new Date() }]);
+    setMessages((prev) => [...prev, { text, isOwn: true, timestamp: new Date() }]);
     setText("");
   };
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
   const getStatusIcon = (msg) => {
     if (!msg.isOwn) return null;
-    return msg.seen ?
-      <span style={{ color: "#34b7f1", fontSize: "10px", marginLeft: "4px" }}>✓✓</span> :
-      <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
+    return msg.seen ? (
+      <span style={{ color: "#34b7f1", fontSize: "10px", marginLeft: "4px" }}>✓✓</span>
+    ) : (
+      <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>
+    );
   };
 
-  // Drag handlers (touch only)
+  // Drag handlers
   const handleTouchStart = (e) => {
     dragStartY.current = e.touches[0].clientY;
     isDragging.current = true;
     e.preventDefault();
   };
-
   const handleTouchMove = (e) => {
     if (!isDragging.current) return;
-    const currentY = e.touches[0].clientY;
-    const delta = currentY - dragStartY.current;
+    const delta = e.touches[0].clientY - dragStartY.current;
     let newOffset = dragOffset + delta;
-    // Limit dragging: can't go above 0 (top) and max 200px down (so header becomes visible)
     newOffset = Math.min(Math.max(newOffset, -100), 300);
     setDragOffset(newOffset);
-    dragStartY.current = currentY;
+    dragStartY.current = e.touches[0].clientY;
     e.preventDefault();
   };
-
   const handleTouchEnd = () => {
     isDragging.current = false;
-    // Optional: snap to top if near top? Not needed.
   };
 
   const getResponsiveStyles = () => {
     const width = window.innerWidth;
-    if (width <= 480) {
+    if (width <= 480)
       return {
         headerHeight: "55px",
         avatarSize: "35px",
         fontSize: "14px",
         bubblePadding: "8px 12px",
-        inputPadding: "10px"
+        inputPadding: "10px",
       };
-    } else if (width <= 768) {
+    if (width <= 768)
       return {
         headerHeight: "60px",
         avatarSize: "40px",
         fontSize: "15px",
         bubblePadding: "10px 14px",
-        inputPadding: "12px"
+        inputPadding: "12px",
       };
-    } else {
-      return {
-        headerHeight: "65px",
-        avatarSize: "40px",
-        fontSize: "16px",
-        bubblePadding: "10px 14px",
-        inputPadding: "12px"
-      };
-    }
+    return {
+      headerHeight: "65px",
+      avatarSize: "40px",
+      fontSize: "16px",
+      bubblePadding: "10px 14px",
+      inputPadding: "12px",
+    };
   };
 
   const responsive = getResponsiveStyles();
@@ -230,9 +236,8 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       background: "linear-gradient(180deg, #1f2937, #111827)",
       zIndex: 1000,
       transition: isDragging.current ? "none" : "top 0.2s ease",
-      boxShadow: "0 -2px 10px rgba(0,0,0,0.2)",
       borderRadius: "20px 20px 0 0",
-      overflow: "hidden"
+      overflow: "hidden",
     },
     dragHandle: {
       width: "40px",
@@ -241,7 +246,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       borderRadius: "10px",
       margin: "10px auto",
       cursor: "grab",
-      touchAction: "none"
+      touchAction: "none",
     },
     header: {
       height: responsive.headerHeight,
@@ -252,13 +257,9 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       background: "rgba(255,255,255,0.05)",
       backdropFilter: "blur(10px)",
       borderBottom: "1px solid rgba(255,255,255,0.08)",
-      flexShrink: 0
+      flexShrink: 0,
     },
-    headerLeft: {
-      display: "flex",
-      alignItems: "center",
-      gap: "5px"
-    },
+    headerLeft: { display: "flex", alignItems: "center", gap: "5px" },
     backButton: {
       background: "transparent",
       border: "none",
@@ -271,7 +272,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       height: "25px",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
     },
     avatar: {
       width: responsive.avatarSize,
@@ -280,34 +281,23 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       overflow: "hidden",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
     },
-    avatarImage: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    },
-    userInfo: {
-      flex: 1,
-      marginLeft: "5px"
-    },
+    avatarImage: { width: "100%", height: "100%", objectFit: "cover" },
+    userInfo: { flex: 1, marginLeft: "5px" },
     name: {
       fontSize: responsive.fontSize,
       fontWeight: "600",
       color: "#f3f4f6",
-      lineHeight: 1.3
+      lineHeight: 1.3,
     },
-    sub: {
-      fontSize: "10px",
-      color: "#9ca3af",
-      lineHeight: 1.2
-    },
+    sub: { fontSize: "10px", color: "#9ca3af", lineHeight: 1.2 },
     chatBox: {
       flex: 1,
       padding: isMobile ? "12px" : "20px",
       overflowY: "auto",
       display: "flex",
-      flexDirection: "column"
+      flexDirection: "column",
     },
     bubble: {
       padding: responsive.bubblePadding,
@@ -316,7 +306,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       color: "#fff",
       wordBreak: "break-word",
       maxWidth: isMobile ? "80%" : "70%",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
+      boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
     },
     messageFooter: {
       display: "flex",
@@ -324,14 +314,14 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       alignItems: "center",
       gap: "4px",
       marginTop: "4px",
-      marginRight: "8px"
+      marginRight: "8px",
     },
     inputBox: {
       padding: responsive.inputPadding,
       background: "#1f2937",
       borderTop: "1px solid rgba(255,255,255,0.08)",
       position: "relative",
-      flexShrink: 0
+      flexShrink: 0,
     },
     inputWrapper: {
       display: "flex",
@@ -339,7 +329,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       gap: "8px",
       background: "#374151",
       borderRadius: "28px",
-      padding: "6px 12px"
+      padding: "6px 12px",
     },
     emojiBtn: {
       background: "transparent",
@@ -352,7 +342,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       color: "#9ca3af",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
     },
     input: {
       flex: 1,
@@ -361,7 +351,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       outline: "none",
       background: "transparent",
       color: "#fff",
-      fontSize: responsive.fontSize
+      fontSize: responsive.fontSize,
     },
     sendBtn: {
       background: "linear-gradient(135deg, #6366f1, #4f46e5)",
@@ -374,14 +364,23 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
-    }
+      justifyContent: "center",
+    },
   };
 
   if (!selectedUser) {
     return (
       <div style={styles.wrapper}>
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "20px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            textAlign: "center",
+            padding: "20px",
+          }}
+        >
           <div>
             <div style={{ fontSize: "80px", marginBottom: "20px" }}>💬</div>
             <h3 style={{ color: "#fff" }}>Welcome to ChatApp</h3>
@@ -394,7 +393,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
   return (
     <div
-      ref={containerRef}
       style={styles.wrapper}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -413,16 +411,15 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
               src={Userprofile || "https://via.placeholder.com/40"}
               alt="Profile"
               style={styles.avatarImage}
-              onError={(e) => { e.target.src = "https://via.placeholder.com/40"; }}
+              onError={(e) => (e.target.src = "https://via.placeholder.com/40")}
             />
           </div>
           <div style={styles.userInfo}>
-            <div style={styles.name}>{selectedUser || "Select user"}</div>
+            <div style={styles.name}>{selectedUser}</div>
             <div style={styles.sub}>{indicator || "Online"}</div>
           </div>
         </div>
       </div>
-
       <div style={styles.chatBox}>
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", color: "#6b7280", marginTop: "40px" }}>
@@ -432,18 +429,29 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
           </div>
         ) : (
           messages.map((m, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: m.isOwn ? "flex-end" : "flex-start", marginBottom: "8px" }}>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: m.isOwn ? "flex-end" : "flex-start",
+                marginBottom: "8px",
+              }}
+            >
               <div style={{ maxWidth: isMobile ? "80%" : "70%" }}>
-                <div style={{
-                  ...styles.bubble,
-                  background: m.isOwn ? "#4f46e5" : "#1f2937",
-                  borderBottomRightRadius: m.isOwn ? "4px" : "18px",
-                  borderBottomLeftRadius: m.isOwn ? "18px" : "4px"
-                }}>
+                <div
+                  style={{
+                    ...styles.bubble,
+                    background: m.isOwn ? "#4f46e5" : "#1f2937",
+                    borderBottomRightRadius: m.isOwn ? "4px" : "18px",
+                    borderBottomLeftRadius: m.isOwn ? "18px" : "4px",
+                  }}
+                >
                   {m.text}
                 </div>
                 <div style={styles.messageFooter}>
-                  <span style={{ fontSize: "10px", color: "#9ca3af" }}>{formatTime(m.timestamp)}</span>
+                  <span style={{ fontSize: "10px", color: "#9ca3af" }}>
+                    {formatTime(m.timestamp)}
+                  </span>
                   {getStatusIcon(m)}
                 </div>
               </div>
@@ -452,7 +460,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         )}
         <div ref={messagesEndRef} />
       </div>
-
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={styles.emojiBtn}>
@@ -466,9 +473,16 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
             placeholder="Type a message..."
             style={styles.input}
           />
-          <button onClick={send} style={styles.sendBtn}>➤</button>
+          <button onClick={send} style={styles.sendBtn}>
+            ➤
+          </button>
         </div>
-        {showEmojiPicker && <EmojiPickerComponent onEmojiSelect={onSelectEmoji} onClose={() => setShowEmojiPicker(false)} />}
+        {showEmojiPicker && (
+          <EmojiPickerComponent
+            onEmojiSelect={onSelectEmoji}
+            onClose={() => setShowEmojiPicker(false)}
+          />
+        )}
       </div>
     </div>
   );
