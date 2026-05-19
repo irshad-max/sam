@@ -11,17 +11,17 @@ const path = require("path");
 const fs = require("fs");
 const connectDB = require("./data-base/db-starter");
 
-// Data‑base schema
+// Database schema
 const User = require("./data-base/user-module");
 const Request = require("./data-base/db-request");
 const Msg = require("./data-base/db-msg--collector");
 
 const app = express();
 
-// ========== PRODUCTION CORS ==========
+// ========== CORS ==========
 const allowedOrigins = process.env.FRONTEND_URL 
     ? [process.env.FRONTEND_URL] 
-    : ["http://localhost:3000"];
+    : ["http://localhost:5173", "http://localhost:3000"];  // include Vite port
 app.use(cors({
     origin: allowedOrigins,
     credentials: true,
@@ -31,10 +31,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 const server = http.createServer(app);
 
-// ========== JWT SECRET FROM ENV ==========
+// ========== JWT SECRET ==========
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-    console.error("FATAL ERROR: JWT_SECRET is not defined in environment variables.");
+    console.error("FATAL ERROR: JWT_SECRET is not defined.");
     process.exit(1);
 }
 
@@ -68,13 +68,13 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
     }
 });
 
-const otpStore = new Map(); 
-
+// ========== OTP STORAGE (temporary) ==========
+const otpStore = new Map();
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// ========== REGISTER – returns OTP in response (demo) ==========
+// ========== REGISTER ==========
 app.post("/register", async (req, res) => {
     const { name, email, password, profileImage } = req.body;
     if (!name || !email || !password) {
@@ -88,7 +88,7 @@ app.post("/register", async (req, res) => {
         }
 
         const otp = generateOTP();
-        const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+        const otpExpiry = Date.now() + 10 * 60 * 1000;
 
         otpStore.set(email, {
             otp,
@@ -101,7 +101,7 @@ app.post("/register", async (req, res) => {
             }
         });
 
-        // ⚠️ In production, never return OTP in response. This is for demo only.
+        // For demo only – in production, send OTP via email/SMS
         res.status(200).json({
             message: "OTP generated successfully",
             email: email,
@@ -114,7 +114,7 @@ app.post("/register", async (req, res) => {
     }
 });
 
-
+// ========== VERIFY OTP ==========
 app.post("/verify-otp", async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -153,7 +153,7 @@ app.post("/verify-otp", async (req, res) => {
         otpStore.delete(email);
 
         res.json({
-            message: "Email verified successfully! Registration complete.",
+            message: "Email verified successfully!",
             token,
             user: {
                 id: user._id,
@@ -191,21 +191,20 @@ app.post("/resend-otp", async (req, res) => {
     }
 });
 
-// ========== LOGIN API ==========
+// ========== LOGIN ==========
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
-    const verify = await User.findOne({ email });
-    if (!verify) return res.status(401).json({ error: "Email is wrong" });
-    const ismatch = await bcrypt.compare(password, verify.password);
-    if (!ismatch) return res.status(401).json({ error: "Password is wrong" });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ error: "Email is wrong" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: "Password is wrong" });
     const token = jwt.sign(
-        { _id: verify._id },
+        { _id: user._id },
         JWT_SECRET,
         { expiresIn: "7d" }
     );
-    res.json({ token, name: verify.name, profileImage: verify.profileImage });
+    res.json({ token, name: user.name, profileImage: user.profileImage });
 });
-
 
 // ========== AUTH MIDDLEWARE ==========
 const auth = (req, res, next) => {
@@ -213,22 +212,28 @@ const auth = (req, res, next) => {
     if (!authHeader) return res.status(401).json({ error: "No token provided" });
     const token = authHeader.split(" ")[1];
     try {
-        const decode = jwt.verify(token, JWT_SECRET);
-        req.userid = decode._id;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.userid = decoded._id;
         next();
     } catch (err) {
         return res.status(401).json({ error: "Invalid token" });
     }
 };
 
-app.post("/verify-token", auth, (req, res) => {
-    // If we reach here, the token is valid
+// ========== TOKEN VERIFICATION (FIXED) ==========
+app.post("/verify-token", auth, async (req, res) => {
+    // Check if user still exists in database
+    const user = await User.findById(req.userid);
+    if (!user) {
+        return res.status(401).json({ error: "User not found", valid: false });
+    }
     res.json({ valid: true, userId: req.userid });
 });
+
 // ========== OTHER API ENDPOINTS ==========
 app.post("/users", async (req, res) => {
-    const alluser = await User.find({}, "_id name profileImage");
-    res.send(alluser);
+    const allUsers = await User.find({}, "_id name profileImage");
+    res.send(allUsers);
 });
 
 app.post("/fetchmsg", auth, async (req, res) => {
@@ -239,7 +244,7 @@ app.post("/fetchmsg", auth, async (req, res) => {
             { sender, receiver },
             { sender: receiver, receiver: sender }
         ]
-    }).sort({ createAt: 1 });
+    }).sort({ createdAt: 1 });
     const formattedMessages = msg.map(message => ({
         text: message.text,
         sender: message.sender,
@@ -256,8 +261,8 @@ app.post("/request", auth, async (req, res) => {
 });
 
 app.post("/request-show", auth, async (req, res) => {
-    const find_request = await Request.find({ receiver: req.userid, status: "pending" }).populate("sender", "name profileImage");
-    res.send(find_request);
+    const requests = await Request.find({ receiver: req.userid, status: "pending" }).populate("sender", "name profileImage");
+    res.send(requests);
 });
 
 app.post("/accept-request/:id", async (req, res) => {
@@ -273,27 +278,25 @@ app.get("/friends", auth, async (req, res) => {
 });
 
 // ========== SERVE REACT FRONTEND (if built) ==========
-// This must come AFTER all API routes, but BEFORE the catch‑all.
 const frontendBuildPath = path.join(__dirname, "../client-side/dist");
 if (fs.existsSync(frontendBuildPath)) {
     app.use(express.static(frontendBuildPath));
-    // For any request that is NOT an API or file upload, send index.html
     app.get("*", (req, res, next) => {
         const requestPath = req.path;
-        // Skip API routes, upload endpoints, and static files already handled
         if (requestPath.startsWith("/api") || 
             requestPath === "/upload-image" || 
             requestPath === "/login" || 
             requestPath === "/register" ||
             requestPath === "/verify-otp" ||
             requestPath === "/resend-otp" ||
+            requestPath === "/verify-token" ||
             requestPath.startsWith("/uploads")) {
             return next();
         }
         res.sendFile(path.join(frontendBuildPath, "index.html"));
     });
 } else {
-    console.log("⚠️ Frontend build not found. Serving API only. If you have a React frontend, ensure it is built into ../client/build");
+    console.log("⚠️ Frontend build not found. API only.");
 }
 
 // ========== SOCKET.IO ==========
@@ -308,8 +311,8 @@ io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
     try {
-        const decode = jwt.verify(token, JWT_SECRET);
-        socket.userid = decode._id;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        socket.userid = decoded._id;
         next();
     } catch (err) {
         next(new Error("Invalid token"));

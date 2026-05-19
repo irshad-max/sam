@@ -1,128 +1,124 @@
-import axios from 'axios'
-import Auth from './LOGINPAGE'
-import { useState, useEffect } from 'react'
-import Sidebar from './Sidebar'
-import ChatArea from './chatarea'
+import axios from 'axios';
+import Auth from './LOGINPAGE';
+import { useState, useEffect } from 'react';
+import Sidebar from './Sidebar';
+import ChatArea from './chatarea';
+
+// Set base URL for axios – adjust according to your environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+axios.defaults.baseURL = API_BASE_URL;
 
 function App() {
-  const [show, setshow] = useState(false)
-  const [token, setToken] = useState("")
-  const [message, setmessage] = useState([])
-  const [showChat, setShowChat] = useState(false)
+  const [show, setShow] = useState(false);
+  const [token, setToken] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [showChat, setShowChat] = useState(false);
   const [selectedUser, setSelectedUser] = useState({
     name: "",
     id: "",
     profileImage: ""
-  })
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
-  const [isCheckingToken, setIsCheckingToken] = useState(true)  // to avoid flickering
+  });
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isCheckingToken, setIsCheckingToken] = useState(true);
 
-  // Check for existing token on app load
+  // Check existing token on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem("token")
+    const storedToken = localStorage.getItem("token");
     if (storedToken) {
-      // Optional: validate token with backend
-      validateToken(storedToken)
+      validateToken(storedToken);
     } else {
-      setIsCheckingToken(false)
+      setIsCheckingToken(false);
     }
-  }, [])
+  }, []);
 
   const validateToken = async (storedToken) => {
     try {
-      // Send token to a verification endpoint (adjust URL as needed)
       const response = await axios.post('/verify-token', {}, {
         headers: { Authorization: `Bearer ${storedToken}` }
-      })
+      });
       if (response.data.valid) {
-        setToken(storedToken)
-        setshow(true)
+        setToken(storedToken);
+        setShow(true);
       } else {
-        // Token invalid → clear storage
-        localStorage.removeItem("token")
-        setshow(false)
+        localStorage.removeItem("token");
+        setShow(false);
       }
     } catch (error) {
-      // If backend returns 401 or any error, assume token is invalid
-      console.error("Token validation failed", error)
-      localStorage.removeItem("token")
-      setshow(false)
+      console.error("Token validation failed", error);
+      localStorage.removeItem("token");
+      setShow(false);
     } finally {
-      setIsCheckingToken(false)
+      setIsCheckingToken(false);
     }
-  }
+  };
 
-  // Optional: add an axios interceptor to handle 401 globally
+  // Global 401 interceptor
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       response => response,
       error => {
         if (error.response?.status === 401) {
-          // Token expired or invalid → logout
-          localStorage.removeItem("token")
-          setToken("")
-          setshow(false)
-          setShowChat(false)
+          localStorage.removeItem("token");
+          setToken("");
+          setShow(false);
+          setShowChat(false);
         }
-        return Promise.reject(error)
+        return Promise.reject(error);
       }
-    )
-    return () => axios.interceptors.response.eject(interceptor)
-  }, [])
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  const auth = (data) => { 
+  const auth = (data) => {
     axios.post("/register", {
       name: data.name,
       email: data.email,
       password: data.password,
     }).then(res => {
-      setToken(res.data.token)
-      setshow(true)
+      setToken(res.data.token);
+      setShow(true);
     }).catch(err => {
-      console.log("Registration error:", err)
-    })
-  }
+      console.log("Registration error:", err);
+    });
+  };
 
-  const fetchmsg = async (id) => {
-    if (!id || !token) return;
+  const fetchMessages = async (userId) => {
+    if (!userId || !token) return;
     try {
       const res = await axios.post(
         "/fetchmsg",
-        { receiver: id },
+        { receiver: userId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setmessage(res.data.msg || []);
+      setMessages(res.data.msg || []);
     } catch (err) {
       console.log("Error fetching messages:", err);
-      setmessage([]);
+      setMessages([]);
     }
   };
 
   const handleUserSelect = (userData) => {
-    setShowChat(false)
+    setShowChat(false);
     setSelectedUser({
       name: userData.name,
       id: userData.id,
       profileImage: userData.profileImage
     });
-    fetchmsg(userData.id).then(() => {
-      setTimeout(() => setShowChat(true), 150)
-    })
+    fetchMessages(userData.id).then(() => {
+      setTimeout(() => setShowChat(true), 150);
+    });
   };
 
-  const handleBack = () => {
-    setShowChat(false)
-  };
+  const handleBack = () => setShowChat(false);
 
-  // While checking token, show nothing or a loading spinner
   if (isCheckingToken) {
-    return <div style={{ background: "#0a0a0a", color: "#00ff00", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading...</div>
+    return <div style={{ background: "#0a0a0a", color: "#00ff00", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading...</div>;
   }
 
   if (isMobile) {
@@ -131,20 +127,20 @@ function App() {
         {show ? (
           <div style={styles.mobileContainer}>
             {!showChat ? (
-              <Sidebar 
-                token={token} 
+              <Sidebar
+                token={token}
                 user_id={handleUserSelect}
-                getmsg={fetchmsg}
+                getmsg={fetchMessages}
                 isMobile={true}
                 onUserSelect={handleUserSelect}
               />
             ) : (
               <div style={styles.chatMobileWrapper}>
-                <ChatArea 
-                  selectedUser={selectedUser.name} 
-                  id={selectedUser.id} 
-                  token={token} 
-                  prev_msg={message} 
+                <ChatArea
+                  selectedUser={selectedUser.name}
+                  id={selectedUser.id}
+                  token={token}
+                  prev_msg={messages}
                   uid={selectedUser.id}
                   Userprofile={selectedUser.profileImage}
                   onBack={handleBack}
@@ -153,20 +149,20 @@ function App() {
             )}
           </div>
         ) : (
-          <Auth registration={auth} show={setshow} setToken={setToken} />
+          <Auth registration={auth} show={setShow} setToken={setToken} />
         )}
       </>
-    )
+    );
   }
 
   return (
     <>
       {show ? (
         <div style={styles.desktopContainer}>
-          <Sidebar 
-            token={token} 
+          <Sidebar
+            token={token}
             user_id={handleUserSelect}
-            getmsg={fetchmsg}
+            getmsg={fetchMessages}
             isMobile={false}
             onUserSelect={handleUserSelect}
           />
@@ -184,21 +180,21 @@ function App() {
               </div>
             </div>
           ) : (
-            <ChatArea 
-              selectedUser={selectedUser.name} 
-              id={selectedUser.id} 
-              token={token} 
-              prev_msg={message} 
+            <ChatArea
+              selectedUser={selectedUser.name}
+              id={selectedUser.id}
+              token={token}
+              prev_msg={messages}
               uid={selectedUser.id}
               Userprofile={selectedUser.profileImage}
             />
           )}
         </div>
       ) : (
-        <Auth registration={auth} show={setshow} setToken={setToken} />
+        <Auth registration={auth} show={setShow} setToken={setToken} />
       )}
     </>
-  )
+  );
 }
 
 const styles = {
@@ -268,30 +264,27 @@ const styles = {
     animation: "bubbleAnim 1.5s ease-in-out infinite",
     animationDelay: "0.6s"
   }
-}
+};
 
-// Add global animations
-const styleSheet = document.createElement("style")
+// Inject global animations
+const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes slideInRight {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
   }
-  
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(30px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  
   @keyframes bounce {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-20px); }
   }
-  
   @keyframes bubbleAnim {
     0%, 100% { transform: translateY(0); opacity: 0.3; }
-    50% { transform: translateY(-15px);
-  
+    50% { transform: translateY(-15px); opacity: 1; }
+  }
   @media (max-width: 768px) {
     body {
       overflow: hidden;
@@ -299,7 +292,7 @@ styleSheet.textContent = `
       padding: 0;
     }
   }
-`
-document.head.appendChild(styleSheet)
+`;
+document.head.appendChild(styleSheet);
 
-export default App
+export default App;
