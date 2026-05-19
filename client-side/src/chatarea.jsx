@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
 const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
- const emojis = [
+  const emojis = [
     '🐦', '⃤💘', '⃟👋', '⃝🌷', '🦅', '♕', '🌹','🔥',
     '🏵️', '💮', '💐', '元', '🃏', '🎴', '🎭', '🏴‍☠️', '🏴', '🏳️', '🌌',
     '❄️', '🌘', '⨌', '⏰', '✂️', '💴', '🎸', '🎶', '👽', '🕉️',
@@ -34,10 +34,7 @@ const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
       {emojis.map((emoji, index) => (
         <button
           key={index}
-          onClick={() => {
-            onEmojiSelect(emoji);
-            onClose();
-          }}
+          onClick={() => { onEmojiSelect(emoji); onClose(); }}
           style={{
             fontSize: '28px',
             background: 'transparent',
@@ -63,36 +60,48 @@ const EmojiPickerComponent = ({ onEmojiSelect, onClose }) => {
   );
 };
 
-// ========== MAIN CHATAREA COMPONENT ==========
 const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack }) => {
   const [text, setText] = useState("");
   const [indicator, setindicator] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  // Dragging state
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragStartY = useRef(0);
+  const isDragging = useRef(false);
+  const containerRef = useRef(null);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Mobile detection
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket connection – relative URL (empty string)
+  // Hardware back button (closes chat)
+  useEffect(() => {
+    if (!isMobile || !onBack) return;
+    const handlePopState = (e) => {
+      e.preventDefault();
+      onBack();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isMobile, onBack]);
+
+  // Socket connection
   useEffect(() => {
     if (!token) return;
-    socketRef.current = io("", {
-      auth: { token }
-    });
-
+    socketRef.current = io("", { auth: { token } });
     socketRef.current.on("receive_message", (msg) => {
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         text: msg.text,
         isOwn: false,
         seen: false,
@@ -100,22 +109,16 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       }]);
       setindicator("");
     });
-
     return () => socketRef.current?.disconnect();
   }, [token]);
 
   // Typing indicator
   useEffect(() => {
     if (!id) return;
-
-    socketRef.current.emit("pass_indicator", { id });
-    socketRef.current.on("typing_indicator", (notify) => {
-      setindicator(notify.text);
-    });
-
+    socketRef.current?.emit("pass_indicator", { id });
+    socketRef.current?.on("typing_indicator", (notify) => setindicator(notify.text));
     return () => {
       socketRef.current?.off("typing_indicator");
-      socketRef.current?.off("pass_indicator");
       setindicator("");
     };
   }, [text, id]);
@@ -135,20 +138,16 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   }, [uid, prev_msg]);
 
-  // Auto scroll to bottom
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const onSelectEmoji = (emoji) => {
-    setText(prev => prev + emoji);
-  };
-
+  const onSelectEmoji = (emoji) => setText(prev => prev + emoji);
   const send = () => {
     if (!text.trim() || !id) return;
-
     socketRef.current?.emit("send_message", { text, id });
-    setMessages((prev) => [...prev, { text, isOwn: true, timestamp: new Date() }]);
+    setMessages(prev => [...prev, { text, isOwn: true, timestamp: new Date() }]);
     setText("");
   };
 
@@ -157,12 +156,35 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-
   const getStatusIcon = (msg) => {
     if (!msg.isOwn) return null;
     return msg.seen ?
       <span style={{ color: "#34b7f1", fontSize: "10px", marginLeft: "4px" }}>✓✓</span> :
       <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
+  };
+
+  // Drag handlers (touch only)
+  const handleTouchStart = (e) => {
+    dragStartY.current = e.touches[0].clientY;
+    isDragging.current = true;
+    e.preventDefault();
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging.current) return;
+    const currentY = e.touches[0].clientY;
+    const delta = currentY - dragStartY.current;
+    let newOffset = dragOffset + delta;
+    // Limit dragging: can't go above 0 (top) and max 200px down (so header becomes visible)
+    newOffset = Math.min(Math.max(newOffset, -100), 300);
+    setDragOffset(newOffset);
+    dragStartY.current = currentY;
+    e.preventDefault();
+  };
+
+  const handleTouchEnd = () => {
+    isDragging.current = false;
+    // Optional: snap to top if near top? Not needed.
   };
 
   const getResponsiveStyles = () => {
@@ -198,13 +220,28 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
   const styles = {
     wrapper: {
-      flex: 1,
+      position: "fixed",
+      top: `${dragOffset}px`,
+      left: 0,
+      right: 0,
+      bottom: 0,
       display: "flex",
       flexDirection: "column",
       background: "linear-gradient(180deg, #1f2937, #111827)",
-      height: "100vh",
-      width: "100%",
+      zIndex: 1000,
+      transition: isDragging.current ? "none" : "top 0.2s ease",
+      boxShadow: "0 -2px 10px rgba(0,0,0,0.2)",
+      borderRadius: "20px 20px 0 0",
       overflow: "hidden"
+    },
+    dragHandle: {
+      width: "40px",
+      height: "5px",
+      background: "#6b7280",
+      borderRadius: "10px",
+      margin: "10px auto",
+      cursor: "grab",
+      touchAction: "none"
     },
     header: {
       height: responsive.headerHeight,
@@ -214,7 +251,8 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       padding: isMobile ? "8px 12px" : "12px 20px",
       background: "rgba(255,255,255,0.05)",
       backdropFilter: "blur(10px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)"
+      borderBottom: "1px solid rgba(255,255,255,0.08)",
+      flexShrink: 0
     },
     headerLeft: {
       display: "flex",
@@ -292,7 +330,8 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       padding: responsive.inputPadding,
       background: "#1f2937",
       borderTop: "1px solid rgba(255,255,255,0.08)",
-      position: "relative"
+      position: "relative",
+      flexShrink: 0
     },
     inputWrapper: {
       display: "flex",
@@ -342,14 +381,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   if (!selectedUser) {
     return (
       <div style={styles.wrapper}>
-        <div style={{
-          flex: 1,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          padding: "20px"
-        }}>
+        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "20px" }}>
           <div>
             <div style={{ fontSize: "80px", marginBottom: "20px" }}>💬</div>
             <h3 style={{ color: "#fff" }}>Welcome to ChatApp</h3>
@@ -361,7 +393,14 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   }
 
   return (
-    <div style={styles.wrapper}>
+    <div
+      ref={containerRef}
+      style={styles.wrapper}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div style={styles.dragHandle} />
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           {isMobile && (
@@ -374,9 +413,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
               src={Userprofile || "https://via.placeholder.com/40"}
               alt="Profile"
               style={styles.avatarImage}
-              onError={(e) => {
-                e.target.src = "https://via.placeholder.com/40";
-              }}
+              onError={(e) => { e.target.src = "https://via.placeholder.com/40"; }}
             />
           </div>
           <div style={styles.userInfo}>
@@ -395,29 +432,18 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
           </div>
         ) : (
           messages.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                justifyContent: m.isOwn ? "flex-end" : "flex-start",
-                marginBottom: "8px"
-              }}
-            >
+            <div key={i} style={{ display: "flex", justifyContent: m.isOwn ? "flex-end" : "flex-start", marginBottom: "8px" }}>
               <div style={{ maxWidth: isMobile ? "80%" : "70%" }}>
-                <div
-                  style={{
-                    ...styles.bubble,
-                    background: m.isOwn ? "#4f46e5" : "#1f2937",
-                    borderBottomRightRadius: m.isOwn ? "4px" : "18px",
-                    borderBottomLeftRadius: m.isOwn ? "18px" : "4px"
-                  }}
-                >
+                <div style={{
+                  ...styles.bubble,
+                  background: m.isOwn ? "#4f46e5" : "#1f2937",
+                  borderBottomRightRadius: m.isOwn ? "4px" : "18px",
+                  borderBottomLeftRadius: m.isOwn ? "18px" : "4px"
+                }}>
                   {m.text}
                 </div>
                 <div style={styles.messageFooter}>
-                  <span style={{ fontSize: "10px", color: "#9ca3af" }}>
-                    {formatTime(m.timestamp)}
-                  </span>
+                  <span style={{ fontSize: "10px", color: "#9ca3af" }}>{formatTime(m.timestamp)}</span>
                   {getStatusIcon(m)}
                 </div>
               </div>
@@ -429,13 +455,9 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
-          <button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            style={styles.emojiBtn}
-          >
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={styles.emojiBtn}>
             😊
           </button>
-
           <input
             ref={inputRef}
             value={text}
@@ -444,18 +466,9 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
             placeholder="Type a message..."
             style={styles.input}
           />
-
-          <button onClick={send} style={styles.sendBtn}>
-            ➤
-          </button>
+          <button onClick={send} style={styles.sendBtn}>➤</button>
         </div>
-
-        {showEmojiPicker && (
-          <EmojiPickerComponent
-            onEmojiSelect={onSelectEmoji}
-            onClose={() => setShowEmojiPicker(false)}
-          />
-        )}
+        {showEmojiPicker && <EmojiPickerComponent onEmojiSelect={onSelectEmoji} onClose={() => setShowEmojiPicker(false)} />}
       </div>
     </div>
   );
