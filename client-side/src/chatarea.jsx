@@ -74,7 +74,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Detect mobile
+  // Mobile detect
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
@@ -82,7 +82,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Hardware back button handling (Android)
+  // Hardware back button handler
   useEffect(() => {
     if (!isMobile || !onBack) return;
     window.history.pushState(null, '', window.location.href);
@@ -140,7 +140,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   }, [uid, prev_msg]);
 
-  // Auto-scroll
+  // Auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -165,16 +165,15 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
   };
 
-  // 🟢 FIXED: Simple and robust responsive styles – header always visible
+  // ✅ FIXED: No fixed positioning, pure flex – header always visible
   const styles = {
     wrapper: {
       display: "flex",
       flexDirection: "column",
       background: "linear-gradient(180deg, #1f2937, #111827)",
-      height: "100vh",
       width: "100%",
-      overflow: "hidden",
-      position: "relative"
+      height: "100%",
+      overflow: "hidden"
     },
     header: {
       flexShrink: 0,
@@ -326,7 +325,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
 
   return (
     <div style={styles.wrapper}>
-      {/* HEADER - always visible */}
+      {/* Header – always on top */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           {isMobile && (
@@ -349,7 +348,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         </div>
       </div>
 
-      {/* MESSAGES AREA */}
+      {/* Messages area */}
       <div style={styles.chatBox}>
         {messages.length === 0 ? (
           <div style={{ textAlign: "center", color: "#6b7280", marginTop: "40px" }}>
@@ -387,7 +386,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* INPUT BAR */}
+      {/* Input bar */}
       <div style={styles.inputBox}>
         <div style={styles.inputWrapper}>
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={styles.emojiBtn}>
