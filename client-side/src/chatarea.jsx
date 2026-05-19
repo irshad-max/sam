@@ -75,16 +75,38 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Detect mobile device
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket connection – relative URL (empty string)
+  // 🟢 HARDWARE BACK BUTTON HANDLER (Android/iPhone)
+  useEffect(() => {
+    if (!isMobile || !onBack) return;
+
+    // Push a dummy state to intercept the back button
+    window.history.pushState(null, '', window.location.href);
+    
+    const handlePopState = (event) => {
+      event.preventDefault();
+      if (onBack) onBack();  // close chat and show sidebar
+      // Push another dummy state so that further back presses also work
+      window.history.pushState(null, '', window.location.href);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // Clean up: remove our dummy state so normal navigation works later
+      window.history.back();
+    };
+  }, [isMobile, onBack]);
+
+  // Socket connection
   useEffect(() => {
     if (!token) return;
     socketRef.current = io("", {
@@ -108,14 +130,13 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
   useEffect(() => {
     if (!id) return;
 
-    socketRef.current.emit("pass_indicator", { id });
-    socketRef.current.on("typing_indicator", (notify) => {
+    socketRef.current?.emit("pass_indicator", { id });
+    socketRef.current?.on("typing_indicator", (notify) => {
       setindicator(notify.text);
     });
 
     return () => {
       socketRef.current?.off("typing_indicator");
-      socketRef.current?.off("pass_indicator");
       setindicator("");
     };
   }, [text, id]);
@@ -135,18 +156,14 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     }
   }, [uid, prev_msg]);
 
-  // Auto scroll to bottom
+  // Auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const onSelectEmoji = (emoji) => {
-    setText(prev => prev + emoji);
-  };
-
+  const onSelectEmoji = (emoji) => setText(prev => prev + emoji);
   const send = () => {
     if (!text.trim() || !id) return;
-
     socketRef.current?.emit("send_message", { text, id });
     setMessages((prev) => [...prev, { text, isOwn: true, timestamp: new Date() }]);
     setText("");
@@ -165,84 +182,54 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       <span style={{ color: "#9ca3af", fontSize: "10px", marginLeft: "4px" }}>✓</span>;
   };
 
-  const getResponsiveStyles = () => {
-    const width = window.innerWidth;
-    if (width <= 480) {
-      return {
-        headerHeight: "55px",
-        avatarSize: "35px",
-        fontSize: "14px",
-        bubblePadding: "8px 12px",
-        inputPadding: "10px"
-      };
-    } else if (width <= 768) {
-      return {
-        headerHeight: "60px",
-        avatarSize: "40px",
-        fontSize: "15px",
-        bubblePadding: "10px 14px",
-        inputPadding: "12px"
-      };
-    } else {
-      return {
-        headerHeight: "65px",
-        avatarSize: "40px",
-        fontSize: "16px",
-        bubblePadding: "10px 14px",
-        inputPadding: "12px"
-      };
-    }
-  };
-
-  const responsive = getResponsiveStyles();
-
+  // Responsive styles with 100dvh for mobile
   const styles = {
     wrapper: {
-      flex: 1,
       display: "flex",
       flexDirection: "column",
       background: "linear-gradient(180deg, #1f2937, #111827)",
-      height: "100vh",
+      height: "100dvh",
       width: "100%",
-      overflow: "hidden"
+      overflow: "hidden",
+      position: "relative"
     },
     header: {
-      height: responsive.headerHeight,
+      flexShrink: 0,
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       padding: isMobile ? "8px 12px" : "12px 20px",
       background: "rgba(255,255,255,0.05)",
       backdropFilter: "blur(10px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)"
+      borderBottom: "1px solid rgba(255,255,255,0.08)",
+      minHeight: "55px"
     },
     headerLeft: {
       display: "flex",
       alignItems: "center",
-      gap: "5px"
+      gap: "8px",
+      flex: 1
     },
     backButton: {
       background: "transparent",
       border: "none",
-      fontSize: "31px",
+      fontSize: "28px",
       color: "white",
       cursor: "pointer",
       padding: "0",
-      marginRight: "10px",
-      width: "27px",
-      height: "25px",
+      width: "32px",
+      height: "32px",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      borderRadius: "50%"
     },
     avatar: {
-      width: responsive.avatarSize,
-      height: responsive.avatarSize,
+      width: "40px",
+      height: "40px",
       borderRadius: "50%",
       overflow: "hidden",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
+      flexShrink: 0
     },
     avatarImage: {
       width: "100%",
@@ -251,30 +238,32 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
     },
     userInfo: {
       flex: 1,
-      marginLeft: "5px"
+      minWidth: 0
     },
     name: {
-      fontSize: responsive.fontSize,
+      fontSize: "16px",
       fontWeight: "600",
       color: "#f3f4f6",
-      lineHeight: 1.3
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
     },
     sub: {
-      fontSize: "10px",
-      color: "#9ca3af",
-      lineHeight: 1.2
+      fontSize: "11px",
+      color: "#9ca3af"
     },
     chatBox: {
       flex: 1,
-      padding: isMobile ? "12px" : "20px",
       overflowY: "auto",
+      padding: isMobile ? "12px" : "20px",
       display: "flex",
-      flexDirection: "column"
+      flexDirection: "column",
+      gap: "8px"
     },
     bubble: {
-      padding: responsive.bubblePadding,
+      padding: "10px 14px",
       borderRadius: "18px",
-      fontSize: responsive.fontSize,
+      fontSize: "15px",
       color: "#fff",
       wordBreak: "break-word",
       maxWidth: isMobile ? "80%" : "70%",
@@ -285,11 +274,12 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       justifyContent: "flex-end",
       alignItems: "center",
       gap: "4px",
-      marginTop: "4px",
+      marginTop: "2px",
       marginRight: "8px"
     },
     inputBox: {
-      padding: responsive.inputPadding,
+      flexShrink: 0,
+      padding: "10px 12px",
       background: "#1f2937",
       borderTop: "1px solid rgba(255,255,255,0.08)",
       position: "relative"
@@ -300,7 +290,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       gap: "8px",
       background: "#374151",
       borderRadius: "28px",
-      padding: "6px 12px"
+      padding: "4px 12px"
     },
     emojiBtn: {
       background: "transparent",
@@ -308,7 +298,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       borderRadius: "50%",
       width: "36px",
       height: "36px",
-      fontSize: "20px",
+      fontSize: "22px",
       cursor: "pointer",
       color: "#9ca3af",
       display: "flex",
@@ -322,7 +312,7 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
       outline: "none",
       background: "transparent",
       color: "#fff",
-      fontSize: responsive.fontSize
+      fontSize: "16px"
     },
     sendBtn: {
       background: "linear-gradient(135deg, #6366f1, #4f46e5)",
@@ -400,7 +390,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
               style={{
                 display: "flex",
                 justifyContent: m.isOwn ? "flex-end" : "flex-start",
-                marginBottom: "8px"
               }}
             >
               <div style={{ maxWidth: isMobile ? "80%" : "70%" }}>
@@ -435,7 +424,6 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
           >
             😊
           </button>
-
           <input
             ref={inputRef}
             value={text}
@@ -444,12 +432,10 @@ const ChatArea = ({ selectedUser, Userprofile, id, token, prev_msg, uid, onBack 
             placeholder="Type a message..."
             style={styles.input}
           />
-
           <button onClick={send} style={styles.sendBtn}>
             ➤
           </button>
         </div>
-
         {showEmojiPicker && (
           <EmojiPickerComponent
             onEmojiSelect={onSelectEmoji}
