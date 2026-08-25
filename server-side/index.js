@@ -69,11 +69,13 @@ app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
 
 // ========== OTP STORAGE (temporary) ==========
 const otpStore = new Map();
+
+//========== OTP GENERATOR ==========
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// ========== USER ROUTES ==========  
+// ========== USER ROUTES ==========
 app.post("/register", async (req, res) => {
   const { name, email, password, profileImage } = req.body;
   if (!name || !email || !password)
@@ -89,7 +91,7 @@ app.post("/register", async (req, res) => {
       profileImage,
     });
     const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: "7d" });
-    res.status(200).json({ message: "REGISTER SUCCESSFULLY", token});
+    res.status(200).json({ message: "REGISTER SUCCESSFULLY", token });
   } catch (error) {
     res.status(500).json({ error: "Registration failed" });
   }
@@ -100,14 +102,13 @@ app.post("/verify/email", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
   try {
-    if (await User.findOne({ email })) {
+    if (!await User.findOne({ email })) {
       return res.status(400).json({ error: "Email not found" });
     }
     const otp = generateOTP();
     const expiry = Date.now() + 300000; // 5 minutes
-    const Secure_Code = generateOTP();
-    otpStore.set(Secure_Code, { otp, expiry });
-    res.status(200).json({ message: "Email sent", Secure_Code, otp });
+    otpStore.set(email, { otp, expiry });
+    res.status(200).json({ message: "Email sent successfully"});
   } catch {
     res.status(500).json({ message: "validation failed" });
   }
@@ -115,22 +116,24 @@ app.post("/verify/email", async (req, res) => {
 
 // =========== verification otp ROUTES ===========
 app.post("/verify-otp", async (req, res) => {
-  const { code, otp } = req.body;
-  if (!code || !otp)
+  const { email, otp } = req.body;
+  if (!email || !otp)
     return res.status(400).json({ error: "Email and OTP required" });
   try {
-    const storedData = otpStore.get(code);
+    const storedData = otpStore.get(email);
     if (!storedData)
       return res.status(400).json({ error: "No OTP request found" });
     if (Date.now() > storedData.expiry) {
-      otpStore.delete(code);
+      otpStore.delete(email);
       return res.status(400).json({ error: "OTP expired" });
     }
     if (storedData.otp !== otp)
       return res.status(400).json({ error: "Invalid OTP" });
-    res.status(200).json({
-      message: "Verification successful",
+
+    const resetToken = jwt.sign({ email }, JWT_SECRET, {
+      expiresIn: Date.now() + 5 * 60 * 1000,
     });
+    res.status(200).json({ message: "Verification successful", resetToken });
   } catch (error) {
     res.status(500).json({ error: "Verification failed" });
   }
@@ -138,20 +141,20 @@ app.post("/verify-otp", async (req, res) => {
 
 // =========== resend otp ROUTES ==========
 app.post("/resend-otp", async (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ error: "Email required" });
-  const storedData = otpStore.get(code);
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+  const storedData = otpStore.get(email);
   if (!storedData)
     return res
       .status(400)
       .json({ error: "No OTP request found for this email" });
   storedData.otp = generateOTP();
   storedData.expiry = Date.now() + 10 * 60 * 1000;
-  otpStore.set(code, storedData);
-  res.json({ message: "New OTP generated", otp: storedData.otp });
+  otpStore.set(email, storedData);
+  res.json({ message: "New OTP Send Successfully" });
 });
 
-// =========== LOGIN ROUTES =========== 
+// =========== LOGIN ROUTES ===========
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
@@ -160,6 +163,34 @@ app.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Password is wrong" });
   const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: "7d" });
   res.json({ token, name: user.name, profileImage: user.profileImage });
+});
+
+// ========== RESET AUTH CHECKER ===========
+const checkerToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: "No token provided" });
+  const token = authHeader.split(" ")[1];
+  try {
+    res.email = jwt.verify(token, JWT_SECRET).email;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+};
+
+// =========== RESET PASSWPRD ROUTES ===========
+app.post("/reset-password", checkerToken, async (req, res) => {
+  const {password } = req.body;
+  try {
+    const user = await User.findOne({ email: res.email });
+    if (!user) return res.status(401).json({ error: "Email is wrong" });
+    const hashpassword = await bcrypt.hash(password, 10);
+    user.password =await hashpassword;
+    await user.save();
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Password reset failed" });
+  }
 });
 
 // =========== AUTH MIDDLEWARE ===========
