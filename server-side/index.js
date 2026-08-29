@@ -1,5 +1,7 @@
 //packages
 require("dotenv").config();
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -35,8 +37,9 @@ if (!JWT_SECRET) {
 
 // ========== IMAGE UPLOAD ==========
 const uploadDir = "./uploads";
+//BEFORE CHECK UPLOAD FOLDER EXITS OR NOT CREATE UPLOAD FOLDER
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+//TELL WHERE FILE SAVE AND WHATS THE UNIQUE NAME AND GIVE CALL BACK AS RETURN
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
@@ -45,26 +48,24 @@ const storage = multer.diskStorage({
   },
 });
 const fileFilter = (req, file, cb) => {
+  //CHECK EXTENTION OF IMAGE VALID OR NOT 
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(
     path.extname(file.originalname).toLowerCase(),
   );
+  //ASLO CEHCK EXTENTION
   const mimetype = allowedTypes.test(file.mimetype);
   if (mimetype && extname) return cb(null, true);
+  //RETURN CALL BACK 
   cb(new Error("Only image files are allowed"));
 };
 const upload = multer({
+  //CALL BACK STORAGE FUNCTION (TO GET UNIQUE NAME)
   storage,
+  //CHECK SIZE OF IAMGE
   limits: { fileSize: 7 * 1024 * 1024 },
+  //CALL BACK FILTER FUNCTION (TO GET EXTENTION IS VALID OR NOT)
   fileFilter,
-});
-app.post("/upload-image", upload.single("profileImage"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.json({ success: true, imageUrl: `/uploads/${req.file.filename}` });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 });
 
 // ========== OTP STORAGE (temporary) ==========
@@ -76,14 +77,18 @@ function generateOTP() {
 }
 
 // ========== USER ROUTES ==========
-app.post("/register", async (req, res) => {
+app.post("/register", upload.single("profileImage"), async (req, res) => {
   const { name, email, password, profileImage } = req.body;
   if (!name || !email || !password)
     return res.status(400).json({ error: "All fields required" });
   try {
-    if (await User.findOne({ email }))
+    if (await User.findOne({ email })) {
       return res.status(400).json({ error: "Email already registered" });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
+    const profileImage = req.file
+      ? `/uploads/${req.file.filename}`
+      : null;
     const user = await User.create({
       name,
       email,
@@ -108,7 +113,7 @@ app.post("/verify/email", async (req, res) => {
     const otp = generateOTP();
     const expiry = Date.now() + 300000; // 5 minutes
     otpStore.set(email, { otp, expiry });
-    res.status(200).json({ message: "Email sent successfully"});
+    res.status(200).json({ message: "Email sent successfully" });
   } catch {
     res.status(500).json({ message: "validation failed" });
   }
@@ -180,12 +185,12 @@ const checkerToken = (req, res, next) => {
 
 // =========== RESET PASSWPRD ROUTES ===========
 app.post("/reset-password", checkerToken, async (req, res) => {
-  const {password } = req.body;
+  const { password } = req.body;
   try {
     const user = await User.findOne({ email: res.email });
     if (!user) return res.status(401).json({ error: "Email is wrong" });
     const hashpassword = await bcrypt.hash(password, 10);
-    user.password =await hashpassword;
+    user.password = await hashpassword;
     await user.save();
     res.json({ message: "Password reset successfully" });
   } catch (error) {
@@ -235,49 +240,89 @@ app.post("/fetchmsg", auth, async (req, res) => {
   res.json({ msg: formattedMessages, currentuser: req.userid });
 });
 
-// ===========GET USER ROUTES ===========
-app.post("/users", async (req, res) => {
-  res.send(await User.find({}, "_id name profileImage"));
+// ===========GET PERTICULAR USER ROUTES ===========
+app.get("/api/search", async (req, res) => {
+  try {
+    const { text } = req.query;
+    const result = await User.find({
+      name: { $regex: text }
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // =========== REQUEST ROUTES ===========
 app.post("/request", auth, async (req, res) => {
-  const newRequest = await Request.create({
-    sender: req.userid,
-    receiver: req.body.receiver,
-    status: "pending",
-  });
-  res.send({ requestId: newRequest._id });
-});
-app.post("/request-show", auth, async (req, res) => {
-  const requests = await Request.find({
-    receiver: req.userid,
-    status: "pending",
-  }).populate("sender", "name profileImage");
-  res.send(requests);
-});
-app.post("/accept-request/:id", async (req, res) => {
-  const accept = await Request.findByIdAndUpdate(
-    req.params.id,
-    { status: "accepted" },
-    { returnDocument: "after" },
-  );
-  await User.findByIdAndUpdate(accept.sender, {
-    $addToSet: { friend: accept.receiver },
-  });
-  await User.findByIdAndUpdate(accept.receiver, {
-    $addToSet: { friend: accept.sender },
-  });
-  res.send(accept);
-});
-app.get("/friends", auth, async (req, res) => {
-  const user = await User.findById(req.userid).populate(
-    "friend",
-    "_id name profileImage",
-  );
-  res.json(user.friend);
+  try {
+    const newRequest = await Request.create({
+      sender: req.userid,
+      receiver: req.body.receiver,
+      status: "pending",
+    });
+    res.status(200).json({ message: "request send succesfully" })
+  }
+  catch (e) {
+    res.status(500).json({ message: "server error" })
+  }
 });
 
+//======== SHOW REQUEST ROUTES ==========
+app.get("/request-show", auth, async (req, res) => {
+  try {
+    const requests = await Request.find({
+      receiver: req.userid,
+      status: "pending",
+    }).populate("sender", "name profileImage");
+    res.status(200).send(requests);
+  }
+  catch (e) {
+    res.status(500).json({ message: "server error" })
+  }
+});
+
+//========== ACCEPT REQUEST ROUTES AND ADD FRIEND IN BOTH FRINED LIST ==========
+app.post("/accept-request/:id", async (req, res) => {
+  try {
+    const accept = await Request.findByIdAndUpdate(
+      req.params.id,
+      { status: "accepted" },
+      { returnDocument: "after" },
+    );
+    await User.findByIdAndUpdate(accept.sender, {
+      $addToSet: { friend: accept.receiver },
+    });
+    await User.findByIdAndUpdate(accept.receiver, {
+      $addToSet: { friend: accept.sender },
+    });
+    res.status(200).json({ message: "Friend request accepted" });
+  }
+  catch (e) {
+    res.status(500).json({ message: "server error" })
+  }
+});
+
+//========== GET FRIEND LIST ROUTES ==========
+app.get("/friends", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userid).populate(
+      "friend",
+      "_id name profileImage",
+    );
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+    return res.status(200).json(user.friend);
+  }
+  catch (e) {
+    return res.status(500).json({ message: "server error" })
+  }
+});
+
+// ========== COUNT UNREAD MESSAGE ==========
 app.get("/unread-counts", auth, async (req, res) => {
   try {
     const userId = req.userid;
