@@ -102,13 +102,13 @@ app.post("/verify/email", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
   try {
-    if (!await User.findOne({ email })) {
+    if (!(await User.findOne({ email }))) {
       return res.status(400).json({ error: "Email not found" });
     }
     const otp = generateOTP();
     const expiry = Date.now() + 300000; // 5 minutes
     otpStore.set(email, { otp, expiry });
-    res.status(200).json({ message: "Email sent successfully"});
+    res.status(200).json({ message: "Email sent successfully" });
   } catch {
     res.status(500).json({ message: "validation failed" });
   }
@@ -180,12 +180,12 @@ const checkerToken = (req, res, next) => {
 
 // =========== RESET PASSWPRD ROUTES ===========
 app.post("/reset-password", checkerToken, async (req, res) => {
-  const {password } = req.body;
+  const { password } = req.body;
   try {
     const user = await User.findOne({ email: res.email });
     if (!user) return res.status(401).json({ error: "Email is wrong" });
     const hashpassword = await bcrypt.hash(password, 10);
-    user.password =await hashpassword;
+    user.password = await hashpassword;
     await user.save();
     res.json({ message: "Password reset successfully" });
   } catch (error) {
@@ -296,6 +296,51 @@ app.get("/unread-counts", auth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// =========== EMAIL CHANGE ROUTES ===========
+app.post("/verify-email", auth, async (req, res) => {
+  const { password } = req.body;
+  try {
+    const user = await User.find({ password: password });
+    if (!user) return res.status(400).json({ error: "password is wrong" });
+    // redirect email change page and send response 200
+    res.status(200).json({ message: "Email change successfully" });
+  } catch (e) {
+    res.status(500).json({ error: "Email change failed" });
+  }
+});
+
+// =========== WRITE NOTES ROUTES ===========
+app.post("/write-notes", auth, async (req, res) => {
+  const { notes } = req.body;
+  try {
+    const note = await User.findOne({ _id: req.userid }).updateOne({
+      notes: notes,
+    });
+    res.status(200).json({ message: "Note created successfully", note });
+  } catch (e) {
+    res.status(500).json({ error: "Note creation failed" });
+  }
+});
+
+// =========== PROFILE IMAGE ROUTES ===========
+app.post(
+  "/profile-image",
+  upload.single("profileImage"),
+  auth,
+  async (req, res) => {
+    try {
+      const user = await User.findOne({ _id: req.userid });
+      if (!user) return res.status(400).json({ error: "User not found" });
+      const profileImage = req.file ? `/uploads/${req.file.filename}` : null;
+      user.profileImage = profileImage;
+      await user.save();
+      res.status(200).json({ message: "Profile image updated successfully" });
+    } catch (e) {
+      res.status(500).json({ error: "Profile image update failed" });
+    }
+  },
+);
 
 // ========== SOCKET.IO ==========
 const io = new Server(server, {
